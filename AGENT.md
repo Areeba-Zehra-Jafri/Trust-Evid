@@ -8,10 +8,10 @@ The project is graded on one complete, working, honest workflow. Finishing the c
 
 1. This file, fully. It's short on purpose.
 2. `CONTEXT.md`: current state of the build (done, decisions, next steps). Trust it instead of re-exploring the repo, and dig into code only when the task needs it.
-3. `SKILLS.md`: a one-page index. Open the **one** file in `/skills` that matches your current task. Open a paired skill (the index's "Pairs with" column) only when the task actually touches that area. Don't load the rest.
+3. `SKILLS.md`: a one-page index. Open **exactly one** file in `/skills` that matches your current task. Don't load the others.
 4. `SPEC.md`: only the section you're working on. Section numbers are used below.
 
-Token budget is limited. Don't re-read files you've already read, don't print large outputs, and prefer small edits over rewrites. If this file and a skill disagree, this file wins: follow it, and log the conflict under "Open questions" in `CONTEXT.md`.
+Token budget is limited. Don't re-read files you've already read, don't print large outputs, and prefer small edits over rewrites. If this file and a skill disagree, this file wins.
 
 ## Session protocol
 
@@ -49,33 +49,10 @@ If a task conflicts with one of these, stop and flag it instead of working aroun
 | Evidence storage | Supabase Storage, private buckets | RLS-aware, signed URLs, free tier |
 | Forensic worker | Python + FastAPI in Docker on a Render free web service | ffmpeg and OpenCV can't run on Vercel functions |
 | AI | Gemini free tier, one model id in one config constant, called from the worker | Multimodal, free, swappable if organizers give credits |
-| Report | JSON + PDF (`@react-pdf/renderer`, wraps text) from Next.js | Machine-readable and human-readable. Spike it early (see Build order). Fallback: a print-styled HTML report. |
+| Report | JSON + PDF (`@react-pdf/renderer`, wraps text) from Next.js | Machine-readable and human-readable. Check it on Day 3. Fallback: a print-styled HTML report. |
 | Tests / CI | pytest, Vitest, SQL tamper tests, GitHub Actions | Maps to the acceptance criteria |
 
 Don't swap or add services without asking. No queue, no Redis, no ORM, no blockchain.
-
-## Repo layout (follow the existing structure if it differs)
-
-```
-/app, /components        Next.js UI and API routes
-/lib/authz, /lib/report  server-side checks, report generation
-/lib/limits.ts           imports worker/limits.json
-/worker                  FastAPI app, Dockerfile, limits.json
-/worker/forensics        hashing, metadata, image and video checks, findings
-/worker/ai               schema, prompt, call, validation
-/supabase/migrations     schema, RLS, custody functions, bucket config
-/skills                  playbooks (see SKILLS.md)
-/gigs                    the two standalone code gigs (extracted copies)
-/tests                   chain, authz, AI-failure, integrity, limits
-.env.example  README.md  SPEC.md  AGENT.md  SKILLS.md  CONTEXT.md
-```
-
-## Env vars (names only; never commit values)
-
-- Web (Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server only), `WORKER_URL`, `WORKER_SHARED_SECRET`
-- Worker (Render): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `WORKER_SHARED_SECRET`, `GEMINI_API_KEY`, `AI_MODEL` (read once into the config constant), `AI_FORCE_FAIL` (optional)
-
-Keep `.env.example` current.
 
 ## System at a glance
 
@@ -88,10 +65,10 @@ Browser reads the evidence row (RLS, select-only) and polls its status
 ```
 
 Flow:
-1. `upload-url`: API verifies session, `aal2`, and membership, checks declared type and size against Limits, creates the `Evidence` row (`awaiting_upload`), and returns a signed upload URL. The storage path is built server-side, and the extension comes from the allow-listed MIME type, never the client filename.
+1. `upload-url`: API verifies session, `aal2`, and membership, checks declared type and size against Limits, creates the `Evidence` row (`awaiting_upload`), and returns a signed upload URL. The storage path is built server-side and the extension comes from the allow-listed MIME type, never the client filename.
 2. Browser uploads straight to Storage (Vercel's 4.5 MB body cap means files never pass through the API).
-3. `finalize`: API confirms the object exists at the expected path, saves reported provenance, sets `queued`, and calls the worker.
-4. Worker atomically claims the job (`queued` to `processing`), streams and hashes the file, and enforces Limits. A file that breaks a limit or has the wrong real type becomes `rejected` and gets a `rejected` custody event. Otherwise the worker writes `sha256_original` once and appends the `intake` custody event if none exists.
+3. `finalize`: API confirms the object exists, saves reported provenance, sets `queued`, and calls the worker.
+4. Worker atomically claims the job (`queued` to `processing`), streams and hashes the file, enforces Limits (over-limit becomes `rejected`), then writes `sha256_original` once and appends the `intake` custody event if none exists.
 5. Worker extracts metadata, runs deterministic checks, saves findings and the rule-based review priority.
 6. Worker calls the AI, validates the output, and saves it.
 7. UI shows progress and results by polling.
@@ -105,19 +82,16 @@ Flow:
 Transitions: `awaiting_upload` → `queued` (finalize) → `processing` (worker claim) → `done` | `failed` | `rejected`.
 - `failed` can be retried. The UI also offers Retry for `queued` rows older than about 3 minutes, which covers jobs lost when the free worker restarted. Retry sets `queued` and re-calls the worker. The worker's atomic claim makes it safe to call twice.
 - `rejected` is final. It means the file broke a limit or was the wrong type. The reason is a short JSON code in `evidence.error`, e.g. `{"limit":"video_max_seconds","max":60,"actual":74}`. The user uploads a different file. Don't show Retry.
-- `awaiting_upload` rows that never finalize are hidden by the UI after about 24 hours.
 - A failed AI stage never hides deterministic results.
-
-UI states to show clearly: awaiting upload, "starting analysis service" (cold worker), queued, processing, done, `incomplete` (AI), `failed` (with Retry), `rejected` (with the reason).
 
 ## Limits (single source of truth: `worker/limits.json`)
 
-Resource limits live in one file. The worker reads it, and the web app imports it through `/lib/limits.ts`, so the Vercel project root must be the repo root. Don't hardcode numbers elsewhere. What exhausts a 512 MB / 0.1 CPU worker is pixels, duration, resolution and frame count, not file bytes. See `skills/19-limits.md` for where each number is enforced. The values are starting guesses: tune them after the Day-1 smoke test, lowering the video caps first. Keep the worst-case job well under 15 minutes, since a free Render service spins down after 15 idle minutes.
+Resource limits live in one file. The worker reads it, and the web app imports it. Don't hardcode numbers elsewhere. What exhausts a 512 MB / 0.1 CPU worker is pixels, duration, resolution and frame count, not file bytes. See `skills/19-limits.md` for where each number is enforced. The values are starting guesses: tune them after the Day-1 smoke test, lowering the video caps first. Keep the worst-case job well under 15 minutes, since a free Render service spins down after 15 idle minutes.
 
 ## Contracts (details in /skills)
 
-- **Worker (Render).** `GET /health`; `POST /process {evidence_id}` returns `202`; `POST /verify {evidence_id}`. All but `/health` need `X-Worker-Secret`. One job at a time. Anything left `processing` at startup is marked `failed`. The web app calls the worker only from server code. When the upload page opens, a server route pings `/health` to wake a sleeping instance.
-- **Custody chain.** In Postgres: locking append function, pgcrypto SHA-256 over a fixed delimiter-joined string, no INSERT/UPDATE/DELETE for any app role, SQL verify function. Events: `intake`, `analysis`, `review`, `verification`, `download`, `rejected`. Chain verification runs through the API with the service role and returns ok or broken. Only investigators also see the broken sequence and reason.
+- **Worker (Render).** `GET /health`; `POST /process {evidence_id}` returns `202`; `POST /verify {evidence_id}`. All but `/health` need `X-Worker-Secret`. One job at a time. Anything left `processing` at startup is marked `failed`.
+- **Custody chain.** In Postgres: locking append function, pgcrypto SHA-256 over a fixed delimiter-joined string, no INSERT/UPDATE/DELETE for any app role, SQL verify function. Events: `intake`, `analysis`, `review`, `verification`, `download`. Chain verification runs through the API with the service role and returns ok or broken. Only investigators also see the broken sequence and reason.
 - **Storage.** `evidence-originals` is write-once and service-role-read. `evidence-derived` holds frames and thumbnails behind signed URLs. Buckets allow JPEG, PNG, MP4 only, with size limits from Limits. Every download writes a `download` event.
 - **Access.** Roles live per case in `case_members` (`investigator`, `uploader`, `examiner`), inserted only server-side, so nobody can self-assign a role. Browsers get select-only RLS access. All writes go through the API or worker. RLS requires `aal2` on every table. Examiners see only evidence assigned to them.
 - **Review priority.** A rule-based bucket (low/medium/high) is computed from weighted deterministic findings, so it exists even when the AI fails. The AI's own priority is stored separately as advisory and can never lower the rule-based one.
@@ -145,7 +119,6 @@ Resource limits live in one file. The worker reads it, and the web app imports i
 - The intake hash comes from the stored bytes, so it cannot prove the file was genuine before intake.
 - Checks are limited and can false-flag normal export or re-encoding. Static CCTV scenes legitimately produce near-identical frames. ELA is informational only and doesn't affect priority.
 - Priority weights and thresholds are starting guesses, not calibrated.
-- Supported formats are JPEG, PNG and MP4 only. HEIC, `.mov`, `.avi` and vendor CCTV formats are rejected. The demo covers MP4 exports, not every CCTV format.
 - Rejected files stay in the write-once bucket.
 - The free-tier worker is slow and sleeps when idle.
 - No labeled evaluation set, so no accuracy claims.
@@ -153,8 +126,8 @@ Resource limits live in one file. The worker reads it, and the web app imports i
 ## Build order
 
 0. **Smoke test first.** Deploy a minimal worker (`/health` + ffprobe) to Render and push the largest demo video through browser, storage, worker and hash match. Record decode time and memory in `CONTEXT.md`, then tune `worker/limits.json`.
-1. **Day 1:** repo structure, `worker/limits.json`, auth + TOTP, schema + RLS, `case_members`, buckets, case creation, upload flow, hashing, metadata, basic dashboard.
-2. **Day 2:** image checks, video checks, findings and priority, AI call, hash verify, custody functions, analysis and integrity views. Spike a sample PDF with `@react-pdf/renderer` on a Vercel deploy. Extract code gig 1.
+1. **Day 1:** auth + TOTP, schema + RLS, `case_members`, buckets, case creation, upload flow, hashing, metadata, basic dashboard.
+2. **Day 2:** image checks, video checks, findings and priority, AI call, hash verify, custody functions, analysis and integrity views. Extract code gig 1.
 3. **Day 3:** end-to-end flow, thin examiner view, report, failure-path tests, deployment, docs. Code gig 2. Verify the final submission.
 
 Don't start the next day's items until the current day's flow works end to end.
@@ -170,7 +143,6 @@ Don't start the next day's items until the current day's flow works end to end.
 - Verifying an altered copy fails
 - Editing or reordering a custody event (as a privileged user in a test) fails chain verification
 - AI failures show an `incomplete` state with deterministic findings and rule-based priority intact
-- A `failed` or stale `queued` upload can be retried
 - Report downloads and separates findings, AI interpretation, and limitations
 
 ## Working style
@@ -178,7 +150,7 @@ Don't start the next day's items until the current day's flow works end to end.
 - Small, focused commits with clear messages (`feat:`, `fix:`, `test:`, `docs:`). Organizers check incremental history, so don't squash.
 - Two required code gigs: the hash/custody-chain module and the AI-output-validation module. Each is standalone with its own short README and example.
 - Test the integrity-critical parts (hash, chain, authz, AI failure, limits). Skip tests for trivial UI.
-- Check current limits in the docs on Day 1: Supabase file size and MFA, Gemini rate limits, image size and a model id that works on the free key, Render memory.
+- Check current limits in the docs on Day 1: Supabase file size and MFA, Gemini rate limits and image size, Render memory.
 - Ambiguous requirement, or a task that would break a non-negotiable? Ask. Don't guess. After two failed attempts at the same problem, stop and ask.
 - README and docs: short, plain, accurate. No overclaiming.
 
