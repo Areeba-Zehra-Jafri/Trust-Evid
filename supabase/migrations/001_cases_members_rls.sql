@@ -104,7 +104,12 @@ declare
   v_case public.cases;
 begin
   insert into public.cases (title, reference_number, description, created_by)
-  values (p_title, p_ref, p_desc, p_user)
+  values (
+    left(p_title, 120),
+    left(p_ref, 40),
+    left(p_desc, 1000),
+    p_user
+  )
   returning * into v_case;
 
   insert into public.case_members (case_id, user_id, role)
@@ -114,8 +119,4 @@ begin
 end;
 $$;
 
-revoke execute on function public.create_case_with_owner(uuid, text, text, text)
-  from public, anon, authenticated;
-grant execute on function public.create_case_with_owner(uuid, text, text, text)
-  to service_role;
-
+grant execute on function public.create_case_with_owner(uuid, text, text, text) to service_role;
