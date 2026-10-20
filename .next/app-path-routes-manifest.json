@@ -1,0 +1,11 @@
+{
+  "/api/cases/route": "/api/cases",
+  "/api/health/route": "/api/health",
+  "/_not-found/page": "/_not-found",
+  "/auth/signup/page": "/auth/signup",
+  "/auth/login/page": "/auth/login",
+  "/cases/new/page": "/cases/new",
+  "/dashboard/page": "/dashboard",
+  "/cases/[id]/page": "/cases/[id]",
+  "/page": "/"
+}
