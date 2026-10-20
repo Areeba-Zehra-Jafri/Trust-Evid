@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 export async function requireAal2User(req: Request) {

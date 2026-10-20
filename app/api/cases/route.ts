@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { validateNewCase } from '@/lib/validate-case';
 
 export async function GET(req: Request) {
-  const { user } = await requireAal2User(req);
+  await requireAal2User(req);
 
   const supabase = createServerClient({ req, res: new Response(), env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -52,7 +52,6 @@ export async function POST(req: Request) {
 
   if (error) {
     if (error.code === '23505') {
-      // Unique violation on reference_number
       return new Response(JSON.stringify({ error: 'reference_number must be unique' }), { status: 409 });
     }
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });

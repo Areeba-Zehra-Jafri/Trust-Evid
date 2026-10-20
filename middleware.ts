@@ -13,15 +13,16 @@ const PUBLIC_PATHS = [
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
 
-  // Allow public paths
   if (PUBLIC_PATHS.some((path) => url.pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  const supabase = createServerClient({ req, res: NextResponse.next() });
+  const supabase = createServerClient({ req, res: NextResponse.next(), env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  }});
   const { data: { user }, error } = await supabase.auth.getUser();
 
-  // Redirect to login if no user
   if (error || !user) {
     if (url.pathname !== '/auth/login') {
       url.pathname = '/auth/login';
@@ -31,17 +32,14 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check AAL levels
   const { data: { currentLevel, nextLevel } } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
   if (currentLevel === 'aal1' && nextLevel === 'aal2') {
-    // user enrolled in TOTP but not verified this session
     if (url.pathname !== '/auth/mfa/verify') {
       url.pathname = '/auth/mfa/verify';
       return NextResponse.redirect(url);
     }
   } else if (currentLevel === 'aal1' && nextLevel === 'aal1') {
-    // user has no enrolled second factor
     if (url.pathname !== '/auth/mfa/enroll') {
       url.pathname = '/auth/mfa/enroll';
       return NextResponse.redirect(url);

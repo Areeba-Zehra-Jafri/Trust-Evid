@@ -3,7 +3,7 @@ import { requireAal2User } from '@/lib/authz';
 import Link from 'next/link';
 
 export default async function DashboardPage() {
-  const { user } = await requireAal2User(new Request('http://localhost'));
+  await requireAal2User(new Request('http://localhost'));
 
   const supabase = createServerClient({
     req: new Request('http://localhost'),

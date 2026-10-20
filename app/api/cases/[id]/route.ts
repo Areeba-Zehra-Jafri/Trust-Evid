@@ -4,7 +4,6 @@ import { createServerClient } from '@supabase/ssr';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const { user } = await requireAal2User(req);
-
   const caseId = params.id;
 
   const role = await requireCaseRole(caseId, user.id, ['investigator', 'uploader', 'examiner']);

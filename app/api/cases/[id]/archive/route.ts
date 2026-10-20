@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { requireAal2User, requireCaseRole } from '@/lib/authz';
 import { createServerClient } from '@supabase/ssr';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user } = await requireAal2User(req);
-  const caseId = params.id;
+  const { id: caseId } = await params;
 
   const role = await requireCaseRole(caseId, user.id, ['investigator']);
   if (!role) {
-    // 404 if not a member
+    // 404 if not member
     const memberCheck = await requireCaseRole(caseId, user.id, ['investigator', 'uploader', 'examiner']);
     if (!memberCheck) {
       return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
