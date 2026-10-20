@@ -1,15 +1,5 @@
 {
-  "image_max_bytes": 10485760,
-  "image_max_pixels": 12000000,
-  "image_analysis_max_side": 1280,
-  "video_max_bytes": 26214400,
-  "video_max_seconds": 60,
-  "video_max_width": 1280,
-  "video_max_height": 720,
-  "frame_max_count": 30,
-  "frame_width": 640,
-  "ai_max_images": 8,
-  "ai_timeout_s": 60,
-  "ffmpeg_timeout_s": 300,
-  "job_timeout_s": 600
+  "max_concurrent_tasks": 5,
+  "max_requests_per_minute": 100,
+  "max_payload_size": 1048576
 }
