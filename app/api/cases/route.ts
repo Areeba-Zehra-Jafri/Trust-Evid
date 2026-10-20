@@ -1,46 +1,57 @@
-/**
- * /api/cases — Phase 1 scaffold.
- *
- * In-memory stub. Phase 2 replaces these handlers with Supabase Postgres calls
- * behind a real session + AAL2 check.
- *
- * ⚠️  This endpoint is intentionally unused by the Phase 1 UI (which calls the
- *     stub-store directly). It exists so the route path is reserved and tests
- *     can be written against it in Phase 2 without a breaking rename.
- */
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAal2User } from '@/lib/authz';
+import { supabaseServer, supabaseAdmin } from '@/lib/supabase/server';
+import { validateNewCase } from '@/lib/validate-case';
 
-import { NextRequest } from "next/server";
-// import { getCases, createCase } from "@/lib/stub-store"; // TODO: Remove stub-store in Phase 2
-import { validateNewCase } from "@/lib/validate-case";
+export async function GET(request: NextRequest) {
+  const user = await requireAal2User(request);
+  if (user instanceof NextResponse) return user;
 
-export async function GET() {
-  return Response.json({ cases: getCases() });
+  const { data: cases, error } = await supabaseServer
+    .from('cases')
+    .select(
+      `*, evidence_count:cases_evidences(count)`
+    )
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to fetch cases' }, { status: 500 });
+  }
+
+  return NextResponse.json({ cases });
 }
 
-export async function POST(req: NextRequest) {
-  let body: unknown;
+export async function POST(request: NextRequest) {
+  const user = await requireAal2User(request);
+  if (user instanceof NextResponse) return user;
+
+  let body: any;
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const input = body as {
-    title?: string;
-    referenceNumber?: string;
-    description?: string;
-  };
-
-  const errors = validateNewCase(input);
+  const errors = validateNewCase(body);
   if (Object.keys(errors).length > 0) {
-    return Response.json({ errors }, { status: 422 });
+    return NextResponse.json({ errors }, { status: 422 });
   }
 
-  const created = createCase({
-    title: input.title!,
-    referenceNumber: input.referenceNumber!,
-    description: input.description ?? "",
+  const { title, referenceNumber, description } = body;
+
+  const { data, error } = await supabaseAdmin.rpc('create_case_with_owner', {
+    p_user: user.id,
+    p_title: title,
+    p_ref: referenceNumber,
+    p_desc: description ?? '',
   });
 
-  return Response.json({ case: created }, { status: 201 });
+  if (error) {
+    if (error.code === '23505' && error.constraint === 'cases_reference_number_key') {
+      return NextResponse.json({ error: 'Reference number already exists' }, { status: 409 });
+    }
+    return NextResponse.json({ error: 'Failed to create case' }, { status: 500 });
+  }
+
+  return NextResponse.json({ case: data }, { status: 201 });
 }

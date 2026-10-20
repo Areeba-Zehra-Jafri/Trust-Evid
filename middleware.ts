@@ -1,50 +1,59 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createMiddlewareSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 import type { Database } from './lib/supabase/types';
 
+const PUBLIC_PATHS = [
+  '/auth/login',
+  '/auth/signup',
+  '/auth/mfa/enroll',
+  '/auth/mfa/verify',
+  '/api/health',
+];
+
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  const url = req.nextUrl.clone();
 
-  // Paths that do not require auth
-  const publicPaths = [
-    '/auth/login',
-    '/auth/signup',
-    '/auth/mfa/enroll',
-    '/auth/mfa/verify',
-    '/api/health',
-  ];
-
-  if (publicPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {
-    return res;
+  // Allow public paths
+  if (PUBLIC_PATHS.some((path) => url.pathname.startsWith(path))) {
+    return NextResponse.next();
   }
 
-  const supabase = createMiddlewareSupabaseClient<Database>({ req, res });
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const supabase = createServerClient<Database>({ req, res: NextResponse.next() });
+  const { data: { user },
+    error
+  } = await supabase.auth.getUser();
 
-  // Redirect to login if no session
-  if (!session) {
-    const loginUrl = new URL('/auth/login', req.url);
-    loginUrl.searchParams.set('redirect', req.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+  // Redirect to login if no user
+  if (error || !user) {
+    if (url.pathname !== '/auth/login') {
+      url.pathname = '/auth/login';
+      url.searchParams.set('redirect', req.nextUrl.pathname);
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
   }
 
-  // Check for AAL2 (TOTP verified)
-  if (!session.user.aal2) {
-    // Redirect to MFA enroll or verify
-    const userHasFactors = session.user.factors && session.user.factors.length > 0;
-    const redirectUrl = new URL(
-      userHasFactors ? '/auth/mfa/verify' : '/auth/mfa/enroll',
-      req.url
-    );
-    return NextResponse.redirect(redirectUrl);
+  // Check AAL levels
+  const { data: { currentLevel, nextLevel } } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  if (currentLevel === 'aal1' && nextLevel === 'aal2') {
+    // user enrolled in TOTP but not verified this session
+    if (url.pathname !== '/auth/mfa/verify') {
+      url.pathname = '/auth/mfa/verify';
+      return NextResponse.redirect(url);
+    }
+  } else if (currentLevel === 'aal1' && nextLevel === 'aal1') {
+    // user has no enrolled second factor
+    if (url.pathname !== '/auth/mfa/enroll') {
+      url.pathname = '/auth/mfa/enroll';
+      return NextResponse.redirect(url);
+    }
   }
 
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard', '/cases/:path*'],
+  matcher: ['/dashboard', '/cases/:path*', '/auth/mfa/:path*'],
 };
