@@ -106,3 +106,6 @@ $$;
 -- Grant execute on create_case_with_owner only to service_role
 revoke execute on function create_case_with_owner(uuid, text, text, text) from public;
 grant execute on function create_case_with_owner(uuid, text, text, text) to service_role;
+
+-- Grant execute on is_case_member to authenticated only
+grant execute on function is_case_member(uuid) to authenticated;
