@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import type { Database } from './lib/supabase/types';
 
 const PUBLIC_PATHS = [
   '/auth/login',
@@ -19,10 +18,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const supabase = createServerClient<Database>({ req, res: NextResponse.next() });
-  const { data: { user },
-    error
-  } = await supabase.auth.getUser();
+  const supabase = createServerClient({ req, res: NextResponse.next() });
+  const { data: { user }, error } = await supabase.auth.getUser();
 
   // Redirect to login if no user
   if (error || !user) {

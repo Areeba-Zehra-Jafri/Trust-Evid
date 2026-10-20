@@ -1,26 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { requireAal2User, requireCaseRole } from '@/lib/authz';
-import { supabaseServer } from '@/lib/supabase/server';
-import { notFound } from 'next/navigation';
+import { createServerClient } from '@supabase/ssr';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const user = await requireAal2User(request);
-  if (user instanceof NextResponse) return user;
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const { user } = await requireAal2User(req);
 
-  const role = await requireCaseRole(params.id, user.id, ['investigator', 'uploader', 'examiner']);
+  const caseId = params.id;
+
+  const role = await requireCaseRole(caseId, user.id, ['investigator', 'uploader', 'examiner']);
   if (!role) {
-    return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
   }
 
-  const { data: caseData, error } = await supabaseServer
+  const supabase = createServerClient({ req, res: new Response(), env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  }});
+
+  const { data, error } = await supabase
     .from('cases')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', caseId)
     .single();
 
-  if (error || !caseData) {
-    return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
+  if (error || !data) {
+    return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
   }
 
-  return new Response(JSON.stringify(caseData), { status: 200, headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify(data), { status: 200 });
 }

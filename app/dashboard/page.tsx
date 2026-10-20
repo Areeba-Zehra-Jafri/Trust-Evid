@@ -1,30 +1,38 @@
-import { supabaseServer } from '@/lib/supabase/server';
+import { createServerClient } from '@supabase/ssr';
 import { requireAal2User } from '@/lib/authz';
-import { redirect } from 'next/navigation';
+import Link from 'next/link';
 
 export default async function DashboardPage() {
-  const user = await requireAal2User(new Request('')); // dummy request
-  if (!user) {
-    redirect('/auth/login');
-  }
+  const { user } = await requireAal2User(new Request('http://localhost'));
 
-  const { data: cases, error } = await supabaseServer
+  const supabase = createServerClient({
+    req: new Request('http://localhost'),
+    res: new Response(),
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    },
+  });
+
+  const { data: cases, error } = await supabase
     .from('cases')
-    .select('*, evidence_count:cases_evidences(count)')
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
-    return <p>Failed to load cases.</p>;
+    throw new Error(error.message);
   }
 
   return (
-    <>
-      <h1>Dashboard</h1>
+    <main className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
       <ul>
-        {cases?.map((c) => (
-          <li key={c.id}>{c.title} ({c.evidence_count})</li>
+        {cases.map((c) => (
+          <li key={c.id}>
+            <Link href={`/cases/${c.id}`}>{c.title}</Link>
+          </li>
         ))}
       </ul>
-    </>
+    </main>
   );
 }

@@ -1,57 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { requireAal2User } from '@/lib/authz';
-import { supabaseServer, supabaseAdmin } from '@/lib/supabase/server';
+import { createServerClient } from '@supabase/ssr';
 import { validateNewCase } from '@/lib/validate-case';
 
-export async function GET(request: NextRequest) {
-  const user = await requireAal2User(request);
-  if (user instanceof NextResponse) return user;
+export async function GET(req: Request) {
+  const { user } = await requireAal2User(req);
 
-  const { data: cases, error } = await supabaseServer
+  const supabase = createServerClient({ req, res: new Response(), env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  }});
+
+  const { data: cases, error } = await supabase
     .from('cases')
     .select(
-      `*, evidence_count:cases_evidences(count)`
+      `*,
+      (select count(*) from evidence where case_id = cases.id) as evidence_count
+    `
     )
     .order('created_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to fetch cases' }, { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  return NextResponse.json({ cases });
+  return new Response(JSON.stringify(cases), { status: 200 });
 }
 
-export async function POST(request: NextRequest) {
-  const user = await requireAal2User(request);
-  if (user instanceof NextResponse) return user;
+export async function POST(req: Request) {
+  const { user } = await requireAal2User(req);
+  const body = await req.json();
 
-  let body: any;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  const validation = validateNewCase(body);
+  if (!validation.valid) {
+    return new Response(JSON.stringify({ error: validation.error }), { status: 400 });
   }
 
-  const errors = validateNewCase(body);
-  if (Object.keys(errors).length > 0) {
-    return NextResponse.json({ errors }, { status: 422 });
-  }
-
-  const { title, referenceNumber, description } = body;
+  const supabaseAdmin = createServerClient({
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    },
+  });
 
   const { data, error } = await supabaseAdmin.rpc('create_case_with_owner', {
     p_user: user.id,
-    p_title: title,
-    p_ref: referenceNumber,
-    p_desc: description ?? '',
+    p_title: body.title,
+    p_ref: body.reference_number,
+    p_desc: body.description,
   });
 
   if (error) {
-    if (error.code === '23505' && error.constraint === 'cases_reference_number_key') {
-      return NextResponse.json({ error: 'Reference number already exists' }, { status: 409 });
+    if (error.code === '23505') {
+      // Unique violation on reference_number
+      return new Response(JSON.stringify({ error: 'reference_number must be unique' }), { status: 409 });
     }
-    return NextResponse.json({ error: 'Failed to create case' }, { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  return NextResponse.json({ case: data }, { status: 201 });
+  return new Response(JSON.stringify(data), { status: 201 });
 }
