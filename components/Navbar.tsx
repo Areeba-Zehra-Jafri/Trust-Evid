@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
-import { STUB_USER } from "@/lib/stub-store";
+import { useState, useEffect } from 'react';
+import { supabaseBrowser } from '../lib/supabase/browser';
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -12,6 +13,26 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const session = supabaseBrowser.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+
+    const { data: authListener } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function signOut() {
+    await supabaseBrowser.auth.signOut();
+    setUser(null);
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm">
@@ -40,15 +61,23 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Stub user pill */}
-        <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
-          <span className="size-2 rounded-full bg-green-400" aria-hidden />
-          <span className="hidden sm:inline">{STUB_USER.displayName}</span>
-          <span className="sm:hidden">Demo</span>
-          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-800 text-[10px] font-semibold uppercase tracking-wide">
-            stub
-          </span>
-        </div>
+        {/* User pill and sign-out */}
+        {user ? (
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
+            <span className="size-2 rounded-full bg-green-400" aria-hidden />
+            <span className="hidden sm:inline">{user.email}</span>
+            <button
+              onClick={signOut}
+              className="ml-2 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
+            <span className="hidden sm:inline">Not signed in</span>
+          </div>
+        )}
       </div>
     </header>
   );

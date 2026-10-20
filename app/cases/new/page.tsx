@@ -28,7 +28,7 @@ export default function NewCasePage() {
         subtitle="Fill in the details below. Reference numbers follow your agency's case-numbering scheme."
       />
 
-      <StubBanner message="Case data is stored in memory only and will reset on page refresh. Database integration lands in Phase 2." />
+
 
       <div className="card p-6">
         <CaseForm onSubmit={handleSubmit} loading={loading} />

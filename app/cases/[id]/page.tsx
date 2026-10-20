@@ -71,7 +71,7 @@ export default function CaseDetailPage() {
         }
       />
 
-      <StubBanner message="Case detail view — in-memory only. Evidence upload, analysis, and custody log land in later phases." />
+
 
       {/* Meta card */}
       <div className="card divide-y divide-slate-100">

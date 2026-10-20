@@ -8,16 +8,42 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { StubBanner } from "@/components/StubBanner";
+
 
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => router.push("/dashboard"), 400);
+    setError('');
+    try {
+      const form = e.target as HTMLFormElement;
+      const email = (form.email as HTMLInputElement).value;
+      const password = (form.password as HTMLInputElement).value;
+      const confirm = (form.confirm as HTMLInputElement).value;
+      if (password !== confirm) {
+        setError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabaseBrowser.auth.signUp({
+        email,
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+      // After signup, user must check email for confirmation
+      router.push('/auth/login');
+    } catch (err) {
+      setError('Unexpected error during sign-up');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -31,20 +57,21 @@ export default function SignupPage() {
       <StubBanner message="Sign-up is a stub — any input proceeds to the dashboard. Supabase Auth + TOTP 2FA land in Phase 2." />
 
       <div className="card p-6">
+        {error && <p className="text-red-600 mb-2">Error: {error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="label">Email address</label>
-            <input id="email" type="email" autoComplete="email"
+            <input id="email" name="email" type="email" autoComplete="email"
               placeholder="investigator@example.gov" className="input" disabled={loading} />
           </div>
           <div>
             <label htmlFor="password" className="label">Password</label>
-            <input id="password" type="password" autoComplete="new-password"
+            <input id="password" name="password" type="password" autoComplete="new-password"
               placeholder="••••••••" className="input" disabled={loading} />
           </div>
           <div>
             <label htmlFor="confirm" className="label">Confirm password</label>
-            <input id="confirm" type="password" autoComplete="new-password"
+            <input id="confirm" name="confirm" type="password" autoComplete="new-password"
               placeholder="••••••••" className="input" disabled={loading} />
           </div>
 
@@ -54,7 +81,7 @@ export default function SignupPage() {
         </form>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          TOTP two-factor authentication setup will follow registration — Phase 2.
+          TOTP two-factor authentication setup will follow registration.
         </p>
       </div>
 

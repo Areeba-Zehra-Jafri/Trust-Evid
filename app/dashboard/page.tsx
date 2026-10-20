@@ -40,7 +40,7 @@ export default function DashboardPage() {
         }
       />
 
-      <StubBanner />
+
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

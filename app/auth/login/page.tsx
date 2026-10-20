@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { StubBanner } from "@/components/StubBanner";
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,11 +22,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // STUB: no real auth — go straight to dashboard
-    setTimeout(() => router.push("/dashboard"), 400);
+    setError('');
+    try {
+      const { data, error } = await supabaseBrowser.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+      if (data.session?.user?.factors && data.session.user.factors.length > 0) {
+        // User has MFA factors enrolled, go to MFA verify
+        router.push('/auth/mfa/verify');
+      } else {
+        // No MFA factors, go to dashboard directly
+        router.push('/dashboard');
+      }
+    } catch (err) {
+      setError('Unexpected error during sign-in');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -76,6 +97,18 @@ export default function LoginPage() {
           <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
             {loading ? "Signing in…" : "Sign in"}
           </button>
+        </form>
+
+        <p className="mt-4 text-center text-xs text-slate-400">
+          Two-factor authentication (TOTP) is required after password verification.
+        </p>
+      </div>
+
+      <p className="text-center text-xs text-slate-400">
+        TRUST-EVID AI is a demonstration prototype. Do not submit real case evidence.
+      </p>
+    </div>
+  );
         </form>
 
         <p className="mt-4 text-center text-xs text-slate-400">
