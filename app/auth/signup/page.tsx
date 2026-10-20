@@ -1,18 +1,14 @@
 "use client";
 
-/**
- * Auth scaffolding — Phase 1 stub.
- * Sign-up shell with no real Supabase call. Phase 2 wires this properly.
- */
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
+import { supabaseBrowser } from '../../../lib/supabase/browser';
 
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +33,6 @@ export default function SignupPage() {
         setLoading(false);
         return;
       }
-      // After signup, user must check email for confirmation
       router.push('/auth/login');
     } catch (err) {
       setError('Unexpected error during sign-up');
@@ -53,8 +48,6 @@ export default function SignupPage() {
         <h1 className="mt-3 text-2xl font-bold text-slate-900">TRUST-EVID AI</h1>
         <p className="mt-1 text-sm text-slate-500">Create an investigator account</p>
       </div>
-
-      <StubBanner message="Sign-up is a stub — any input proceeds to the dashboard. Supabase Auth + TOTP 2FA land in Phase 2." />
 
       <div className="card p-6">
         {error && <p className="text-red-600 mb-2">Error: {error}</p>}
@@ -76,7 +69,7 @@ export default function SignupPage() {
           </div>
 
           <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
-            {loading ? "Creating account…" : "Create account"}
+            {loading ? "Creating account" : "Create account"}
           </button>
         </form>
 

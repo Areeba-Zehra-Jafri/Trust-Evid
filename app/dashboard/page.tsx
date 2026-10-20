@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getCases, deleteCase } from "@/lib/stub-store";
+import { getCases, deleteCase } from "@/lib/stub-store"; // TODO: Remove stub-store in Phase 2
 import type { Case } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
 import { CaseCard } from "@/components/CaseCard";

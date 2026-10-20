@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from './supabase/server';
 
-export async function requireAal2User(request) {
-  const { data: { session }, error } = await supabaseServer.auth.getSession();
+export async function requireAal2User(request: Request) {
+  const { data: { session }, error } = await supabaseServer.auth.getSession({ req: request });
   if (error || !session) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
@@ -13,7 +13,7 @@ export async function requireAal2User(request) {
   return session.user;
 }
 
-function parseAalFromJwt(token) {
+function parseAalFromJwt(token: string): string | null {
   try {
     const payload = token.split('.')[1];
     const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf-8'));

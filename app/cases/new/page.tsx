@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createCase } from "@/lib/stub-store";
+import { createCase } from "@/lib/stub-store"; // TODO: Remove stub-store in Phase 2
 import type { NewCaseInput } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
 import { CaseForm } from "@/components/CaseForm";

@@ -1,58 +1,48 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { supabaseServer } from './lib/supabase/server';
+import { createMiddlewareSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from './lib/supabase/types';
 
-const protectedPaths = ['/dashboard', '/cases'];
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  // Paths that do not require auth
+  const publicPaths = [
+    '/auth/login',
+    '/auth/signup',
+    '/auth/mfa/enroll',
+    '/auth/mfa/verify',
+    '/api/health',
+  ];
 
-  if (!protectedPaths.some((path) => pathname.startsWith(path))) {
-    return NextResponse.next();
+  if (publicPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {
+    return res;
   }
 
-  const { data: { session }, error } = await supabaseServer.auth.getSession({
-    req: request,
-  });
+  const supabase = createMiddlewareSupabaseClient<Database>({ req, res });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (error || !session) {
-    const loginUrl = new URL('/auth/login', request.url);
+  // Redirect to login if no session
+  if (!session) {
+    const loginUrl = new URL('/auth/login', req.url);
+    loginUrl.searchParams.set('redirect', req.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  const aal = session.access_token ? parseAalFromJwt(session.access_token) : null;
-
-  if (aal !== 'aal2') {
-    // Check if user has verified MFA factors
-    const { data: factorsData, error: factorsError } = await supabaseServer.auth.getUserFactors();
-    if (factorsError) {
-      // On error, redirect to login
-      const loginUrl = new URL('/auth/login', request.url);
-      return NextResponse.redirect(loginUrl);
-    }
-    const hasMfa = factorsData?.length > 0;
-    if (!hasMfa) {
-      // Redirect to enroll if no MFA factors
-      const enrollUrl = new URL('/auth/mfa/enroll', request.url);
-      return NextResponse.redirect(enrollUrl);
-    } else {
-      // Redirect to verify if MFA factors exist
-      const verifyUrl = new URL('/auth/mfa/verify', request.url);
-      return NextResponse.redirect(verifyUrl);
-    }
+  // Check for AAL2 (TOTP verified)
+  if (!session.user.aal2) {
+    // Redirect to MFA enroll or verify
+    const userHasFactors = session.user.factors && session.user.factors.length > 0;
+    const redirectUrl = new URL(
+      userHasFactors ? '/auth/mfa/verify' : '/auth/mfa/enroll',
+      req.url
+    );
+    return NextResponse.redirect(redirectUrl);
   }
 
-  return NextResponse.next();
-}
-
-function parseAalFromJwt(token) {
-  try {
-    const payload = token.split('.')[1];
-    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf-8'));
-    return decoded.aal || null;
-  } catch {
-    return null;
-  }
+  return res;
 }
 
 export const config = {
