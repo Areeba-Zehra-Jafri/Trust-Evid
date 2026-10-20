@@ -73,18 +73,18 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="020202020"
+              placeholder="********"
               className="input"
               disabled={loading}
             />
           </div>
 
+          {error && <p className="text-red-600">Error: {error}</p>}
+
           <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
-            {loading ? "Signing in026" : "Sign in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        {error && <p className="mt-4 text-center text-xs text-red-500">{error}</p>}
 
         <p className="mt-4 text-center text-xs text-slate-400">
           Two-factor authentication (TOTP) is required after password verification.

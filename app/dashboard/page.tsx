@@ -6,7 +6,7 @@ import { getCases, deleteCase } from "@/lib/stub-store"; // TODO: Remove stub-st
 import type { Case } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
 import { CaseCard } from "@/components/CaseCard";
-import { StubBanner } from "@/components/StubBanner";
+
 
 export default function DashboardPage() {
   const [cases, setCases] = useState<Case[]>([]);
