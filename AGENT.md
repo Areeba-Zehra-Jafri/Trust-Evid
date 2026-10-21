@@ -100,6 +100,14 @@ Resource limits live in one file. The worker reads it, and the web app imports i
 - **AI.** Input: up to `ai_max_images` selected frames or downscaled images plus findings, with identifying metadata stripped, never the original. Output: pydantic-validated JSON, every cited finding ID must exist, and the text is screened for authenticity claims. One call, plus at most one retry on invalid output. No retry on provider errors. Store model, prompt version, raw and parsed response. `AI_FORCE_FAIL=1` forces a failure.
 - **Report.** Evidence details, integrity status, deterministic findings and priority, AI interpretation (or "incomplete"), examiner notes, limitations, custody history, chain head hash, event count, and generated-at time (these expose truncation).
 
+### Existing database contract and migrations
+
+Before implementing any workflow against Supabase, inspect the existing migrations, functions, triggers, RLS policies, constraints, grants, and bucket configuration relevant to the task. Treat verified database definitions as the current implementation, not as proof that the intended architecture already exists.
+
+The statuses and security guarantees in this document define the intended target. If they conflict with the existing schema or policies, do not silently rename statuses, assume missing columns, or weaken security. Create a focused migration and tests to reconcile the difference. Update `CONTEXT.md` to distinguish verified behavior, planned changes, and unresolved assumptions.
+
+Never claim that a security property is enforced until the implementation and its relevant tests demonstrate it. In particular, distinguish ordinary event-history verification from cryptographic custody-chain verification.
+
 ## Traceability: requirement → where → proof
 
 | Requirement | Implemented in | Proven by |
