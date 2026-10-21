@@ -1,8 +1,6 @@
-
 import { NextResponse } from "next/server";
 import { requireAal2User } from "@/lib/authz";
 import { validateNewCase } from "@/lib/validate-case";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(req: Request) {
   try {
@@ -38,11 +36,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ errors }, { status: 422 });
     }
 
-    const { data, error } = await supabaseAdmin.rpc("create_case_with_owner", {
+    const { data, error } = await supabase.rpc("create_case_with_owner", {
       p_user: user.id,
-      p_title: body.title,
-      p_ref: body.reference_number,
-      p_desc: body.description,
+      p_title: String(body.title ?? ""),
+      p_ref: String(body.reference_number ?? body.reference ?? body.ref ?? ""),
+      p_desc: String(body.description ?? ""),
     });
 
     if (error) {
@@ -51,6 +49,10 @@ export async function POST(req: Request) {
           { error: "reference_number must be unique" },
           { status: 409 }
         );
+      }
+
+      if (error.code === "42501") {
+        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
       }
 
       return NextResponse.json(
