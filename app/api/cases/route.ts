@@ -42,6 +42,7 @@ async function getSupabaseClient() {
 export async function GET(req: Request) {
   try {
     await requireAal2User(req);
+
     const supabase = await getSupabaseClient();
 
     const { data: cases, error } = await supabase
@@ -70,13 +71,10 @@ export async function POST(req: Request) {
     const { user } = await requireAal2User(req);
     const body = await req.json();
 
-    const validation = validateNewCase(body);
+    const errors = validateNewCase(body);
 
-    if (!validation.valid) {
-      return NextResponse.json(
-        { error: validation.error },
-        { status: 400 }
-      );
+    if (Object.keys(errors).length > 0) {
+      return NextResponse.json({ errors }, { status: 422 });
     }
 
     const supabase = await getSupabaseClient();
