@@ -6,7 +6,6 @@ import { createCase } from "@/lib/stub-store"; // TODO: Remove stub-store in Pha
 import type { NewCaseInput } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
 import { CaseForm } from "@/components/CaseForm";
-import { StubBanner } from "@/components/StubBanner";
 
 export default function NewCasePage() {
   const router = useRouter();
@@ -28,13 +27,10 @@ export default function NewCasePage() {
         subtitle="Fill in the details below. Reference numbers follow your agency's case-numbering scheme."
       />
 
-
-
       <div className="card p-6">
         <CaseForm onSubmit={handleSubmit} loading={loading} />
       </div>
 
-      {/* Scaffolding note for future phases */}
       <details className="text-xs text-slate-400">
         <summary className="cursor-pointer font-medium hover:text-slate-600">
           What's planned for this page (Phase 2+)

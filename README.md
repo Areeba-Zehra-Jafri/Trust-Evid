@@ -6,12 +6,12 @@ Trust-Evid is a Next.js 14 application using the App Router and Supabase for aut
 - Case and evidence management system with hash-chained custody logs.
 - Uses Supabase for email/password authentication with mandatory TOTP 2FA (AAL2 level).
 
-## Current Phase 4 Setup
+## Current Phase 5 Setup
 - Email/password login with Supabase Auth.
 - MFA enrollment and verification pages placed correctly under `/auth/mfa/enroll` and `/auth/mfa/verify`.
 - Middleware protects `/dashboard` and `/cases/*` routes, redirecting to login or MFA flows as needed.
 - Navbar shows real session user and sign-out button.
-- StubBanner component removed.
+- The removed placeholder banner is no longer part of the application UI.
 - Stub data store remains in use for cases as a placeholder until the database phase.
 
 ## Running the Project
