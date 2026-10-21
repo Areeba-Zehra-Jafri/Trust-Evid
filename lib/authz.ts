@@ -5,8 +5,8 @@ export async function requireAal2User() {
   const supabase = await createSupabaseServerClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new Response('Unauthorized', { status: 401 });
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal.currentLevel !== 'aal2') throw new Response('Forbidden', { status: 403 });
+  const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aalError || !aal || aal.currentLevel !== 'aal2') throw new Response('Forbidden', { status: 403 });
   return { user, supabase };
 }
 
