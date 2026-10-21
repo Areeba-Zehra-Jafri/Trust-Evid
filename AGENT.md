@@ -17,8 +17,10 @@ Token budget is limited. Don't re-read files you've already read, don't print la
 
 Chats start cold, so the repo carries the memory.
 
-- **Start:** read this file and `CONTEXT.md`.
-- **End, and before any push:** update `CONTEXT.md` following `skills/18-context-handoff.md`. Rewrite, don't append. Pull first and merge facts if a teammate changed it.
+- **Start:** read this file and `CONTEXT.md` from disk. Don't scan the repo to rebuild context.
+- **During:** after each finished subtask, make a small edit to `CONTEXT.md` (Done / In progress / Next). A build can be cut off at any point, so the file must never lag behind the code.
+- **End, as your last action and before any push:** rewrite `CONTEXT.md` following `skills/18-context-handoff.md`. Rewrite, don't append. Pull first and merge facts if a teammate changed it. The final reply ends with `CONTEXT.md updated: yes` or `CONTEXT.md updated: no (reason)`. A task isn't finished until this is done.
+- **If you ran out of budget or stopped early,** still update `CONTEXT.md` and list exactly what's left under "In progress". An unfinished task with a current `CONTEXT.md` is fine. A finished task with a stale one isn't.
 - If `CONTEXT.md` and the code disagree, the code is right. Fix `CONTEXT.md`.
 - Locked decisions in `CONTEXT.md` aren't reopened unless the user asks.
 
