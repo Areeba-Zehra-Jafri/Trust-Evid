@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { supabaseBrowser } from '@/lib/supabase/browser';
 
 export function EvidenceIntake({ caseId }: { caseId: string }) {
   const [file, setFile] = useState<File | null>(null);
@@ -14,7 +15,6 @@ export function EvidenceIntake({ caseId }: { caseId: string }) {
       const init = await fetch(`/api/cases/${caseId}/evidence`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ original_filename: file.name, media_type: file.type, file_size: file.size }) });
       const start = await init.json();
       if (!init.ok) throw new Error(start.error);
-      const { supabaseBrowser } = await import('@/lib/supabase/browser');
       const upload = await supabaseBrowser.storage.from('evidence-originals').uploadToSignedUrl(start.path, start.token, file);
       if (upload.error) throw new Error(upload.error.message);
       const done = await fetch(`/api/cases/${caseId}/evidence/finalize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ evidence_id: start.evidence.id, sha256: hash }) });
