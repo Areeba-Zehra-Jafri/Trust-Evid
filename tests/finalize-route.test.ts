@@ -161,3 +161,48 @@ describe('phase 6 transactional outcome matrix', () => {
     expect(rpc).toHaveBeenCalledWith('finalize_verified_evidence', expect.objectContaining({ p_byte_count: 99 }));
   });
 });
+
+
+describe('phase 6 failure and repeatability matrix', () => {
+  it('does not persist when worker output has a digest/count mismatch', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ sha256: digest, byte_count: 13 }), { status: 200 }));
+    rpc.mockResolvedValueOnce({ data: null, error: new Error('byte count does not match file size') });
+
+    const response = await call({ evidence_id: evidenceId });
+
+    expect(response.status).toBe(500);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(await response.json()).toEqual({ error: 'Could not finalize evidence atomically.' });
+  });
+
+  it('maps an unsupported processing state to a non-success response', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: new Error('evidence status does not permit finalization') });
+
+    const response = await call({ evidence_id: evidenceId });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).not.toHaveProperty('state', 'finalized');
+  });
+
+  it('keeps matching retries repeatable while never accepting a conflicting digest', async () => {
+    rpc.mockResolvedValueOnce({ data: { state: 'finalized', sha256: digest, byte_count: 12 }, error: null });
+    rpc.mockResolvedValueOnce({ data: { state: 'already_finalized', sha256: digest, byte_count: 12 }, error: null });
+
+    expect((await call({ evidence_id: evidenceId })).status).toBe(200);
+    expect((await call({ evidence_id: evidenceId })).status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(2);
+
+    rpc.mockResolvedValueOnce({ data: null, error: new Error('conflicting intake') });
+    expect((await call({ evidence_id: evidenceId })).status).toBe(409);
+  });
+
+  it('rejects unauthorized finalization before evidence lookup or persistence', async () => {
+    auth.requireCaseRole.mockResolvedValueOnce(null);
+
+    const response = await call({ evidence_id: evidenceId });
+
+    expect(response.status).toBe(403);
+    expect(from).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
