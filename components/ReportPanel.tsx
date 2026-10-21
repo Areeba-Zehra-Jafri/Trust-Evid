@@ -15,5 +15,5 @@ export function ReportPanel({ caseId }: { caseId: string }) {
     } catch (error) { window.alert(error instanceof Error ? error.message : 'Report unavailable'); }
     finally { setBusy(false); }
   }
-  return <section className="card mt-6 p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Evidence review report</h2><p className="text-sm text-slate-500">Download a portable JSON record of findings, reviews, notes, custody events, and limitations.</p></div><button className="btn-primary shrink-0" disabled={busy} onClick={download}>{busy ? 'Preparing…' : 'Download report'}</button></div></section>;
+  return <section className="card mt-6 p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Evidence review report</h2><p className="text-sm text-slate-500">Download a portable JSON record of findings, reviews, notes, custody events, and limitations. Hashes support integrity checks, not authenticity.</p></div><button className="btn-primary shrink-0" disabled={busy} onClick={download}>{busy ? 'Preparing…' : 'Download report'}</button></div></section>;
 }

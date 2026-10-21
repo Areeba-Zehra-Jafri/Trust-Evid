@@ -1,5 +1,5 @@
 # CONTEXT.md
-Last updated: Phase 6 Reports, deployment and acceptance batch · report workflow implemented
+Last updated: Phase 6 reports acceptance batch · interactive custody verification and report workflow
 
 ## State
 Phase 1 and Phase 2 are implemented. Phase 3 adds bounded deterministic image/video inspection, a signed worker orchestration route, metadata/signals/frame samples, and persisted processing findings. The Phase 3 migration was applied.
@@ -9,7 +9,7 @@ Phase 1 and Phase 2 are implemented. Phase 3 adds bounded deterministic image/vi
 
 ## In progress
 - Run hosted Vercel/Render acceptance checks: auth isolation, upload failures, worker/AI failures, custody tamper detection, and report download.
-- Replace the case-page evidence selector placeholder with a real evidence list in a subsequent maintenance batch.
+- Local UI now exposes an explicit custody-chain verification state beside each selected evidence item; hosted verification remains pending.
 
 ## Next (in order)
 1. Create the repo structure from AGENT.md. Add `.env.example`, `.gitignore`, and a short README.

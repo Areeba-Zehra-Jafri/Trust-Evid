@@ -52,7 +52,9 @@ Set these in the workspace Secrets panel.
 ## Phase 6: Reports, deployment and acceptance
 - AAL2-protected report download is available from each case at `/api/cases/[id]/report`.
 - Reports include visible evidence, deterministic findings, review priorities, examiner notes, custody events, and explicit limitations. JSON is intentional and can be printed or archived without claiming authenticity or legal admissibility.
-- Case pages provide responsive review, custody verification, and report controls. Use the browser and API smoke checks below before deployment.
+- Case pages provide responsive evidence selection, hash visibility, interactive custody-chain verification, per-item AI/review controls, and report controls. Use the browser and API smoke checks below before deployment.
+- The client uses the verified `supabaseBrowser` export for signed upload URLs; no storage credentials are exposed.
+- The evidence workspace handles loading, empty, error, refresh, and narrow-screen states without exposing storage credentials.
 
 ### Acceptance smoke checks
 1. `npm run typecheck` and `npm run build` must pass.
@@ -65,7 +67,7 @@ Set these in the workspace Secrets panel.
 ## Notes
 - Database migration is locked and not changed in this phase.
 - No new dependencies added beyond what's in package.json.
-- TypeScript checked with `npm run typecheck` and build with `npm run build` completed successfully.
+- TypeScript/build status is not asserted here; run the acceptance commands below in the deployment environment.
 
 ---
 

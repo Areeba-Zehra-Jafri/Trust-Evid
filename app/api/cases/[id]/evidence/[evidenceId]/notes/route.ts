@@ -3,7 +3,8 @@ import { requireAal2User } from '@/lib/authz';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string; evidenceId: string }> }) {
   const { id, evidenceId } = await params;
-  const { supabase } = await requireAal2User();
+  let supabase;
+  try { ({ supabase } = await requireAal2User()); } catch (e) { if (e instanceof Response) return e; throw e; }
   const { data, error } = await supabase.from('examiner_notes').select('*').eq('case_id', id).eq('evidence_id', evidenceId).order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ notes: data });
@@ -11,7 +12,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; evidenceId: string }> }) {
   const { id, evidenceId } = await params;
-  const { supabase, user } = await requireAal2User();
+  let supabase, user;
+  try { ({ supabase, user } = await requireAal2User()); } catch (e) { if (e instanceof Response) return e; throw e; }
   const body = await req.json().catch(() => ({}));
   if (typeof body.note !== 'string' || body.note.trim().length < 3) return NextResponse.json({ error: 'A note is required.' }, { status: 400 });
   const { data, error } = await supabase.from('examiner_notes').insert({ case_id: id, evidence_id: evidenceId, examiner_id: user.id, note: body.note.trim() }).select().single();

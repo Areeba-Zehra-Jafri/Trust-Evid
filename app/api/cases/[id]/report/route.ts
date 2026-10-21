@@ -4,7 +4,9 @@ import { requireAal2User } from '@/lib/authz';
 /** Generates a portable review report from rows visible to the authenticated member. */
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireAal2User();
+  let auth: Awaited<ReturnType<typeof requireAal2User>>;
+  try { auth = await requireAal2User(); } catch (e) { if (e instanceof Response) return e; throw e; }
+  const { supabase } = auth;
   const [{ data: caseData, error: caseError }, evidence, findings, reviews, notes, custody] = await Promise.all([
     supabase.from('cases').select('id,title,reference_number,description,status,created_at,updated_at').eq('id', id).single(),
     supabase.from('evidence').select('*').eq('case_id', id).order('created_at'),
