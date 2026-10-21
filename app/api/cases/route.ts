@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireAal2User } from "@/lib/authz";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { validateNewCase } from "@/lib/validate-case";
 
 async function getSupabaseClient() {
@@ -20,7 +20,13 @@ async function getSupabaseClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(
+        cookiesToSet: {
+          name: string;
+          value: string;
+          options: CookieOptions;
+        }[]
+      ) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
@@ -44,7 +50,10 @@ export async function GET(req: Request) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(cases, { status: 200 });
@@ -87,7 +96,10 @@ export async function POST(req: Request) {
         );
       }
 
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(data, { status: 201 });
