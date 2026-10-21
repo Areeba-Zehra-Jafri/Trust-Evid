@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { requireAal2User, requireCaseRole } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -14,8 +15,12 @@ export async function GET(
     "uploader",
     "examiner",
   ]);
+
   if (!role) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404 }
+    );
   }
 
   const { data, error } = await supabaseAdmin
@@ -25,7 +30,10 @@ export async function GET(
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404 }
+    );
   }
 
   return NextResponse.json(data, { status: 200 });
