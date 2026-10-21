@@ -16,12 +16,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
   }
 
-  const supabaseAdmin = createServerClient({
-    env: {
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-    },
-  });
+  const supabaseAdmin = createServerClient({ env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  }});
 
   const { data: caseData, error: fetchError } = await supabaseAdmin
     .from('cases')

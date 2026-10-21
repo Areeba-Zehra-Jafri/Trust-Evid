@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { NextResponse } from 'next/server';
 
 export async function requireAal2User(req: Request) {
   const res = new Response();
