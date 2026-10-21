@@ -1,23 +1,10 @@
 FROM python:3.11-slim
-
-# Install ffmpeg
-RUN apt-get update && \
-    apt-get install -y ffmpeg && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set working directory
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-# Copy requirements and install
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy app source
-COPY main.py ./
+# Package every worker module so the runtime import graph cannot be truncated.
+COPY *.py ./
 COPY limits.json ./
-
-# Expose port (default to 8000)
 ENV PORT=8000
-
-# Run the app
 CMD sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"

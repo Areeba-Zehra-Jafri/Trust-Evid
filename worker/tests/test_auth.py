@@ -36,3 +36,8 @@ def test_process_success(monkeypatch):
     response = client.post("/process", json={"evidence_id": "test"}, headers=headers)
     assert response.status_code == 202
     assert response.json() == {"accepted": True}
+
+def test_process_rejects_extra_fields(monkeypatch):
+    monkeypatch.setenv("WORKER_SHARED_SECRET", "correctsecret")
+    response = client.post("/process", json={"evidence_id": "test", "storage_path": "untrusted"}, headers={"X-Worker-Secret": "correctsecret"})
+    assert response.status_code == 422
