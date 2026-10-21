@@ -60,10 +60,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(data, { status: 201 });
-  } catch {
-    return NextResponse.json(
-      { error: "Authentication or request failed" },
-      { status: 401 }
-    );
+  } catch (e) {
+    if (e instanceof Response) return e;
+    throw e;
   }
 }

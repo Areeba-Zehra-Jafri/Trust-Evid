@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAal2User } from '@/lib/authz';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; evidenceId: string }> }) {
+  try {
   const { id, evidenceId } = await params;
   const { supabase, user } = await requireAal2User();
   const { data: evidence } = await supabase.from('evidence').select('id,case_id,media_type,processing_status').eq('id', evidenceId).eq('case_id', id).single();
@@ -21,4 +22,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await supabase.from('ai_analyses').update({ status: 'incomplete', error_message: error instanceof Error ? error.message : 'AI analysis failed' }).eq('id', prior.id);
     return NextResponse.json({ error: 'AI analysis incomplete; deterministic findings were preserved.', analysis_id: prior.id }, { status: 502 });
   }
+  } catch (e) { if (e instanceof Response) return e; throw e; }
 }
