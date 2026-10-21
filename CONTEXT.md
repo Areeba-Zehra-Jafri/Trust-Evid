@@ -1,14 +1,15 @@
 # CONTEXT.md
-Last updated: before Day 1 · planning finished · nothing built yet
+Last updated: Phase 6 reports acceptance batch · interactive custody verification and report workflow
 
 ## State
-Planning is done and the stack is locked. The docs exist (AGENT.md, SKILLS.md index, 19 files in /skills, worker/limits.json). No application code yet. Next is repo setup and the Day-1 smoke test.
+Phase 1 and Phase 2 are implemented. Phase 3 adds bounded deterministic image/video inspection, a signed worker orchestration route, metadata/signals/frame samples, and persisted processing findings. The Phase 3 migration was applied.
 
 ## Done
 - SPEC.md (pitch), AGENT.md (rules), SKILLS.md + skills/01-19 (playbooks), worker/limits.json (caps), this file
 
 ## In progress
-- Nothing
+- Run hosted Vercel/Render acceptance checks: auth isolation, upload failures, worker/AI failures, custody tamper detection, and report download.
+- Local UI now exposes an explicit custody-chain verification state beside each selected evidence item; hosted verification remains pending.
 
 ## Next (in order)
 1. Create the repo structure from AGENT.md. Add `.env.example`, `.gitignore`, and a short README.

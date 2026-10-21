@@ -1,42 +1,17 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
-export async function requireAal2User(req: Request) {
-  const res = new Response();
-  const supabase = createServerClient({ req, res, env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  }});
-
+export async function requireAal2User() {
+  const supabase = await createSupabaseServerClient();
   const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
-    throw new Response('Unauthorized', { status: 401 });
-  }
-
-  const { data: { currentLevel } } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (currentLevel !== 'aal2') {
-    throw new Response('Forbidden', { status: 403 });
-  }
-
-  return { user };
+  if (error || !user) throw new Response('Unauthorized', { status: 401 });
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal.currentLevel !== 'aal2') throw new Response('Forbidden', { status: 403 });
+  return { user, supabase };
 }
 
 export async function requireCaseRole(caseId: string, userId: string, allowedRoles: string[]) {
-  const supabaseAdmin = createServerClient({
-    env: {
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-    },
-  });
-
-  const { data, error } = await supabaseAdmin
-    .from('case_members')
-    .select('role')
-    .eq('case_id', caseId)
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !data) return null;
-  if (!allowedRoles.includes(data.role)) return null;
+  const { data, error } = await supabaseAdmin.from('case_members').select('role').eq('case_id', caseId).eq('user_id', userId).maybeSingle();
+  if (error || !data || !allowedRoles.includes(data.role)) return null;
   return data.role;
 }

@@ -1,49 +1,12 @@
 
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { requireAal2User } from "@/lib/authz";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { validateNewCase } from "@/lib/validate-case";
-
-async function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase environment variables are missing.");
-  }
-
-  const cookieStore = await cookies();
-
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(
-        cookiesToSet: {
-          name: string;
-          value: string;
-          options: CookieOptions;
-        }[]
-      ) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Cookie writes may not be available in every server context.
-        }
-      },
-    },
-  });
-}
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(req: Request) {
   try {
-    await requireAal2User(req);
-
-    const supabase = await getSupabaseClient();
+    const { supabase } = await requireAal2User();
 
     const { data: cases, error } = await supabase
       .from("cases")
@@ -68,7 +31,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { user } = await requireAal2User(req);
+    const { user, supabase } = await requireAal2User();
     const body = await req.json();
 
     const errors = validateNewCase(body);
@@ -77,9 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ errors }, { status: 422 });
     }
 
-    const supabase = await getSupabaseClient();
-
-    const { data, error } = await supabase.rpc("create_case_with_owner", {
+    const { data, error } = await supabaseAdmin.rpc("create_case_with_owner", {
       p_user: user.id,
       p_title: body.title,
       p_ref: body.reference_number,

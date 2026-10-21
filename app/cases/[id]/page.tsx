@@ -1,8 +1,12 @@
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { requireCaseRole } from "@/lib/authz";
+import { EvidenceIntake } from "@/components/EvidenceIntake";
+import { ReviewPanel } from "@/components/ReviewPanel";
+import { ReportPanel } from "@/components/ReportPanel";
+import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
+import { CaseEvidenceWorkspace } from "@/components/CaseEvidenceWorkspace";
 
 type CasePageProps = {
   params: Promise<{ id: string }>;
@@ -13,37 +17,7 @@ export default async function CasePage({
 }: CasePageProps) {
   const { id } = await params;
 
-  const cookieStore = await cookies();
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase environment variables are missing.");
-  }
-
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          // Server Components cannot always write cookies.
-          // Middleware or a Route Handler should handle refreshes.
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          } catch {
-            // Cookie writes may be unavailable in Server Components.
-          }
-        },
-      },
-    }
-  );
+  const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },
@@ -80,6 +54,11 @@ export default async function CasePage({
         {caseData.title}
       </h1>
       <p>{caseData.description}</p>
+      {(role === "investigator" || role === "uploader") && <EvidenceIntake caseId={id} />}
+      {role === "examiner" && <p className="mt-6 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Examiner workflow: review findings, record limitations, and preserve notes. This prototype does not establish authenticity or legal admissibility.</p>}
+      <CaseEvidenceWorkspace caseId={id} />
+      <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">Select an evidence item above to open its analysis and review controls. Reports remain available for the whole case.</p>
+      <ReportPanel caseId={id} />
     </main>
   );
 }

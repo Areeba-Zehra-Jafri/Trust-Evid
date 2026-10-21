@@ -1,5 +1,8 @@
 {
   "max_concurrent_tasks": 5,
   "max_requests_per_minute": 100,
-  "max_payload_size": 1048576
+  "max_payload_size": 1048576,
+  "max_file_size": 52428800,
+  "max_sampled_frames": 5,
+  "ffprobe_timeout_seconds": 20
 }
