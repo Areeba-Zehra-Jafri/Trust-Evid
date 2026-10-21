@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 export default function Navbar() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -25,9 +27,11 @@ export default function Navbar() {
   }, []);
 
   async function signOut() {
-    await supabaseBrowser.auth.signOut();
+    const { error } = await supabaseBrowser.auth.signOut();
+    if (error) return;
     setUser(null);
-    window.location.href = "/auth/login";
+    router.push("/auth/login");
+    router.refresh();
   }
 
   return (

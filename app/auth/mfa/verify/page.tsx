@@ -1,25 +1,52 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabaseBrowser } from "@/lib/supabase/browser";
+import { supabaseBrowser } from '@/lib/supabase/browser';
 
 export default function MfaVerifyPage() {
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const [factorId, setFactorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchFactors() {
+      const { data, error } = await supabaseBrowser.auth.mfa.listFactors();
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      if (data?.totp && data.totp.length > 0) {
+        setFactorId(data.totp[0].id);
+      }
+    }
+    fetchFactors();
+  }, []);
 
   async function handleVerify() {
     setLoading(true);
     setError('');
     try {
-      const { error } = await supabaseBrowser.auth.mfa.challenge({ token });
+      if (!factorId) {
+        setError('No MFA factor found for verification');
+        setLoading(false);
+        return;
+      }
+      const challenge = await supabaseBrowser.auth.mfa.challenge({ factorId });
+      if (!challenge.data) {
+        setError('Failed to initiate MFA challenge');
+        setLoading(false);
+        return;
+      }
+      const { error } = await supabaseBrowser.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code: token });
       if (error) {
         setError(error.message);
         setLoading(false);
         return;
       }
+      router.refresh();
       router.push('/dashboard');
     } catch {
       setError('Unexpected error during MFA verification');
