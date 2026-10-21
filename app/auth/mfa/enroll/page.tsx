@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabaseBrowser } from '@/lib/supabase/browser';
+import { createBrowserSupabaseClient } from '@/lib/supabase/browser';
+
+const supabaseBrowser = createBrowserSupabaseClient();
 
 export default function MfaEnrollPage() {
   const [loading, setLoading] = useState(false);

@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabaseBrowser } from '@/lib/supabase/browser';
+import { createBrowserSupabaseClient } from '@/lib/supabase/browser';
+
+const supabaseBrowser = createBrowserSupabaseClient();
 
 export default function MfaVerifyPage() {
   const [token, setToken] = useState('');
