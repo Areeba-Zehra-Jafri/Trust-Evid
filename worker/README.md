@@ -22,5 +22,6 @@ pytest
 The Docker image copies the complete import graph. Gemini is bounded to a
 small response and image input budget; malformed, oversized, or unavailable
 provider output is recorded as incomplete after deterministic persistence.
+AI citations must be non-empty strings matching deterministic finding IDs.
 Claim/retry semantics and custody RPC compatibility still require verification
 against the deployed Supabase schema.

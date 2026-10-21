@@ -27,6 +27,13 @@ def test_validate_rejects_non_string_next_steps():
     with pytest.raises(ValueError): validate(payload, set())
 
 
+def test_validate_rejects_non_string_finding_ids():
+    payload = base()
+    payload["anomalies"] = [{"description": "x", "finding_ids": [1]}]
+    with pytest.raises(ValueError, match="finding citation"):
+        validate(payload, {"1"})
+
+
 def test_validate_rejects_oversized_response():
     with pytest.raises(ValueError, match="too large"):
         validate("{" + "x" * 100001, set())
@@ -54,3 +61,9 @@ def test_validate_rejects_empty_anomaly_title():
     payload["anomalies"] = [{"title": "  ", "description": "signal", "finding_ids": ["known"]}]
     with pytest.raises(ValueError, match="title"):
         validate(payload, {"known"})
+
+
+def test_validate_rejects_unknown_top_level_provider_shape():
+    payload = base()
+    payload["anomalies"] = [{"description": "signal", "finding_ids": ["known"], "location": {"frame": 1}}]
+    assert validate(payload, {"known"})["anomalies"][0]["location"]["frame"] == 1

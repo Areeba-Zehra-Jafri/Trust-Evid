@@ -57,17 +57,21 @@ async def process(request: Request):
             persist_result(client, row, result)
             # Optional and strictly additive: AI failure never invalidates deterministic output.
             try:
-                ai_result, _ = analyze(result.get("sampled_frames", []), [
+                ai_result, raw_response = analyze(result.get("sampled_frames", []), [
                     {"id": "deterministic-metadata", "type": "metadata", "value": result["metadata"]}
                 ])
-                persist_ai(client, row, ai_result, None)
+                # Keep raw provider output auditable, but only persist the validated
+                # structure as parsed_result. Neither replaces deterministic output.
+                persist_ai(client, row, ai_result, None, raw_response=raw_response)
             except (AIError, AIProviderError, ValueError, KeyError, TypeError) as ai_exc:
                 try:
                     persist_ai(client, row, None, str(ai_exc)[:200])
                 except Exception:
                     # AI persistence is optional; deterministic completion remains authoritative.
                     pass
-            return JSONResponse({"accepted": True, "status": "ready"}, 202)
+            # Keep the transport response deliberately small; deterministic status is
+            # persisted in Supabase and callers must not infer AI completion from it.
+            return JSONResponse({"accepted": True}, 202)
         except Exception as exc:
             set_failed(client, evidence_id, str(exc))
             raise HTTPException(400, "Evidence processing failed")

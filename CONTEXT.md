@@ -5,14 +5,15 @@ Last updated: Phase 4 · AI handling, packaging, and tests (stabilization pass)
 - Optional Gemini processing is explicitly opt-in and additive to deterministic findings.
 - Provider and validation failures are represented as incomplete AI processing when persistence succeeds; deterministic output remains authoritative.
 - AI provider responses and inline image inputs now have explicit bounded byte budgets before parsing/transmission.
-- Structured AI output is bounded, citation-checked, and screened for unsafe authenticity claims.
+- Structured AI output is bounded, citation-checked (including citation types), and screened for unsafe authenticity claims.
 - Docker copies the worker runtime import graph and limits.json.
 - Focused worker tests cover authentication, exact intake payloads, limits, hashing, AI validation/failure, and packaging contracts.
 
 ## In progress
 - Test execution and Docker startup were not run because no command runner is available in this workspace.
+- Phase 4 AI persistence stores JSONB-compatible provider raw response separately from validated parsed output and records validated priority.
 - Atomic claim, stale recovery, retry semantics, and custody RPC compatibility remain blocked by unverified deployed database contracts.
-- AI persistence should be verified against deployed ai_analyses uniqueness/columns; repository migration does not declare a unique evidence_id constraint.
+- AI persistence now avoids unsupported evidence_id upsert and carries owner_user_id; deployed column/RLS behavior remains unverified.
 
 ## Next
 1. Run `cd worker && pytest` in CI.

@@ -40,7 +40,9 @@ def validate(raw, ids):
         if not isinstance(anomaly, dict):
             raise ValueError("invalid anomaly")
         cited = anomaly.get("finding_ids")
-        if not isinstance(cited, list) or not cited or not set(cited) <= ids:
+        if (not isinstance(cited, list) or not cited
+                or not all(isinstance(item, str) and item for item in cited)
+                or not set(cited) <= ids):
             raise ValueError("unknown or empty finding citation")
         if not isinstance(anomaly.get("description"), str) or not anomaly["description"].strip():
             raise ValueError("anomaly description must be non-empty")
