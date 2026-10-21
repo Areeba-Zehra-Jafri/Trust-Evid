@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAal2User } from '@/lib/authz';
 import { LIMITS } from '@/lib/limits';
 
-const allowed = new Set([...(LIMITS.image_allowed_types ?? []), ...(LIMITS.video_allowed_types ?? [])]);
-const maxBytes = Math.max(LIMITS.image_max_bytes ?? 0, LIMITS.video_max_bytes ?? 0);
+const allowed = new Set(["image/jpeg", "image/png", "video/mp4"]);
+const maxBytes = LIMITS.max_file_size;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
