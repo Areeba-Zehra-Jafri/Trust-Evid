@@ -25,11 +25,12 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      if (data.session?.user?.factors && data.session.user.factors.length > 0) {
-        router.push("/auth/mfa/verify");
-      } else {
-        router.push("/dashboard");
+      if (!data.session) {
+        setError("Sign-in did not return a session. Please try again.");
+        return;
       }
+      router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       setError("Unexpected error during sign-in");
     } finally {

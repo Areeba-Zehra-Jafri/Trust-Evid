@@ -3,10 +3,9 @@ import { requireAal2User } from '@/lib/authz';
 
 /** Generates a portable review report from rows visible to the authenticated member. */
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const { id } = await params;
-  let auth: Awaited<ReturnType<typeof requireAal2User>>;
-  try { auth = await requireAal2User(); } catch (e) { if (e instanceof Response) return e; throw e; }
-  const { supabase } = auth;
+  const { supabase } = await requireAal2User();
   const [{ data: caseData, error: caseError }, evidence, findings, reviews, notes, custody] = await Promise.all([
     supabase.from('cases').select('id,title,reference_number,description,status,created_at,updated_at').eq('id', id).single(),
     supabase.from('evidence').select('*').eq('case_id', id).order('created_at'),
@@ -23,4 +22,5 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     limitations: ['Demonstration report only.', 'Hashes document integrity checks, not authenticity.', 'No conclusion about guilt, identity, provenance, or legal admissibility.', 'Results depend on available metadata, bounded processing, and reviewer notes.'],
   };
   return new NextResponse(JSON.stringify(report, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8', 'content-disposition': `attachment; filename="trust-evid-${id}.json"` } });
+  } catch (e) { if (e instanceof Response) return e; throw e; }
 }

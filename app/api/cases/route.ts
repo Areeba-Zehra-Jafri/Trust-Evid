@@ -1,8 +1,6 @@
-
 import { NextResponse } from "next/server";
 import { requireAal2User } from "@/lib/authz";
 import { validateNewCase } from "@/lib/validate-case";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(req: Request) {
   try {
@@ -21,11 +19,9 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json(cases, { status: 200 });
-  } catch {
-    return NextResponse.json(
-      { error: "Authentication or request failed" },
-      { status: 401 }
-    );
+  } catch (e) {
+    if (e instanceof Response) return e;
+    throw e;
   }
 }
 
@@ -40,11 +36,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ errors }, { status: 422 });
     }
 
-    const { data, error } = await supabaseAdmin.rpc("create_case_with_owner", {
+    const { data, error } = await supabase.rpc("create_case_with_owner", {
       p_user: user.id,
-      p_title: body.title,
-      p_ref: body.reference_number,
-      p_desc: body.description,
+      p_title: String(body.title ?? "").trim(),
+      p_ref: String(body.referenceNumber ?? "").trim(),
+      p_desc: String(body.description ?? "").trim(),
     });
 
     if (error) {
@@ -55,6 +51,10 @@ export async function POST(req: Request) {
         );
       }
 
+      if (error.code === "42501") {
+        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+      }
+
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
@@ -62,10 +62,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(data, { status: 201 });
-  } catch {
-    return NextResponse.json(
-      { error: "Authentication or request failed" },
-      { status: 401 }
-    );
+  } catch (e) {
+    if (e instanceof Response) return e;
+    throw e;
   }
 }
