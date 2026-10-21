@@ -38,9 +38,9 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabase.rpc("create_case_with_owner", {
       p_user: user.id,
-      p_title: String(body.title ?? ""),
-      p_ref: String(body.reference_number ?? body.reference ?? body.ref ?? ""),
-      p_desc: String(body.description ?? ""),
+      p_title: String(body.title ?? "").trim(),
+      p_ref: String(body.referenceNumber ?? "").trim(),
+      p_desc: String(body.description ?? "").trim(),
     });
 
     if (error) {
