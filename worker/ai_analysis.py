@@ -1,6 +1,9 @@
 """Optional, grounded Gemini analysis with strict, additive validation."""
-import json, os, re
+import json, logging, os, re
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+log = logging.getLogger(__name__)
 
 MODEL = os.getenv("AI_MODEL", "gemini-3-flash-preview")
 PROMPT_VERSION = "ai-grounded-v1"
@@ -9,8 +12,21 @@ MAX_IMAGE_BYTES = 4_000_000
 BANNED = re.compile(r"\b(deepfake[sd]?|forged|forgery|fabricated)\b|\b(is|are|was|appears? to be|confirmed|proven|verified|certified)\s+(as\s+)?(authentic|genuine|fake|tampered|manipulated)\b", re.I)
 REQUIRED = ("summary", "anomalies", "uncertainty", "limitations", "next_steps", "review_priority")
 
-class AIError(Exception): pass
-class AIProviderError(AIError): pass
+
+class AIError(Exception):
+    pass
+
+
+class AIProviderError(AIError):
+    pass
+
+
+def _redact(text, key):
+    text = str(text)
+    if key:
+        text = text.replace(key, "[redacted]")
+    return text
+
 
 def validate(raw, ids):
     # Keep provider output bounded and structural before it reaches persistence.
@@ -53,12 +69,16 @@ def validate(raw, ids):
         location = anomaly.get("location")
         if location is not None and not isinstance(location, (str, dict)):
             raise ValueError("anomaly location must be text or an object")
-    if BANNED.search(json.dumps(result)): raise ValueError("authenticity claim rejected")
+    if BANNED.search(json.dumps(result)):
+        raise ValueError("authenticity claim rejected")
     return result
+
 
 def call_gemini(images, findings):
     key = os.getenv("GEMINI_API_KEY")
-    if not key: raise AIProviderError("GEMINI_API_KEY is not configured")
+    if not key:
+        raise AIProviderError("GEMINI_API_KEY is not configured")
+    key = key.strip()
     prompt = """You provide cautious forensic triage only. Use ONLY supplied findings and images. Never state a check was run unless it is in findings. Cite finding IDs for every anomaly. Never use words authentic, genuine, fake, deepfake, forged, fabricated, tampered, or manipulated. State uncertainty and alternatives. Priority is triage, not probability. Return JSON only with summary, anomalies (description, finding_ids, location), uncertainty, limitations, next_steps, review_priority (low|medium|high).\nFINDINGS:\n""" + json.dumps(findings)
     parts = [{"text": prompt}]
     for image in images[:5]:
@@ -67,16 +87,38 @@ def call_gemini(images, findings):
             if len(encoded) > MAX_IMAGE_BYTES:
                 raise AIError("AI image input is too large")
             parts.append({"inline_data": {"mime_type": image["mime_type"], "data": encoded}})
-    body = json.dumps({"contents":[{"parts":parts}], "generationConfig":{"responseMimeType":"application/json"}}).encode()
-    req = Request(f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={key}", data=body, headers={"Content-Type":"application/json"})
+    body = json.dumps({"contents": [{"parts": parts}], "generationConfig": {"responseMimeType": "application/json"}}).encode()
+    req = Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
+        data=body,
+        headers={"Content-Type": "application/json", "x-goog-api-key": key},
+    )
     try:
         with urlopen(req, timeout=45) as response:
-            body = response.read(MAX_PROVIDER_BYTES + 1)
-            if len(body) > MAX_PROVIDER_BYTES:
+            raw_body = response.read(MAX_PROVIDER_BYTES + 1)
+            if len(raw_body) > MAX_PROVIDER_BYTES:
                 raise AIError("AI provider response is too large")
-            payload=json.loads(body)
+            payload = json.loads(raw_body)
         return payload["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as exc: raise AIProviderError(type(exc).__name__) from exc
+    except AIError:
+        raise
+    except HTTPError as exc:
+        try:
+            detail = exc.read(2000).decode("utf-8", "replace")
+        except Exception:
+            detail = ""
+        msg = _redact(f"Gemini HTTP {exc.code} (model {MODEL}): {detail}", key)[:300]
+        log.error("gemini call failed: %s", msg)
+        raise AIProviderError(msg) from exc
+    except URLError as exc:
+        msg = _redact(f"Gemini network error: {exc.reason}", key)[:300]
+        log.error("gemini call failed: %s", msg)
+        raise AIProviderError(msg) from exc
+    except Exception as exc:
+        msg = _redact(f"Gemini call failed: {type(exc).__name__}: {exc}", key)[:300]
+        log.error("gemini call failed: %s", msg)
+        raise AIProviderError(msg) from exc
+
 
 def analyze(images, findings):
     """Return validated additive interpretation; provider failures stay explicit.
@@ -84,15 +126,19 @@ def analyze(images, findings):
     The raw response is returned separately so persistence can retain an audit
     trail without allowing unvalidated provider text into parsed_result.
     """
-    if os.getenv("AI_FORCE_FAIL") == "1": raise AIError("forced failure")
+    if os.getenv("AI_FORCE_FAIL") == "1":
+        raise AIError("forced failure")
     # Gemini is deliberately opt-in. A missing key is an explicit incomplete
     # result, not a worker crash or a reason to withhold deterministic findings.
     if not os.getenv("GEMINI_API_KEY"):
         raise AIProviderError("GEMINI_API_KEY is not configured")
-    ids={str(f["id"]) for f in findings}
-    for attempt in (1,2):
-        try: raw=call_gemini(images, findings); return validate(raw, ids), raw
-        except AIProviderError: raise
+    ids = {str(f["id"]) for f in findings}
+    for attempt in (1, 2):
+        try:
+            raw = call_gemini(images, findings)
+            return validate(raw, ids), raw
+        except AIProviderError:
+            raise
         except (ValueError, json.JSONDecodeError) as exc:
             if attempt == 2:
                 raise AIError("invalid output after retry") from exc
