@@ -20,7 +20,8 @@ export function EvidenceIntake({ caseId }: { caseId: string }) {
       const done = await fetch(`/api/cases/${caseId}/evidence/finalize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ evidence_id: start.evidence.id, sha256: hash }) });
       const result = await done.json();
       if (!done.ok) throw new Error(result.error);
-      setMessage(`Uploaded. SHA-256: ${hash}`); setFile(null);
+      if (!result.processing_requested) throw new Error('Evidence was finalized but processing was not started.');
+      setMessage(`Uploaded and processing started. SHA-256: ${hash}`); setFile(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Upload failed.'); }
     finally { setBusy(false); }
   }

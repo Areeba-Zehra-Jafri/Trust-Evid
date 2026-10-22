@@ -54,9 +54,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .single();
     if (updError) return NextResponse.json({ error: updError.message }, { status: 400 });
 
-    // TODO: custody 'intake' event (needs record_custody_event fix, see below)
+    // Finalization owns the hand-off: the worker will claim `uploaded` and move
+    // the record through `processing` to `ready` (or `failed`). The worker
+    // receives only its existing evidence_id contract and never a user token.
+    const workerUrl = process.env.WORKER_URL?.replace(/\/$/, '');
+    const workerSecret = process.env.WORKER_SHARED_SECRET;
+    if (!workerUrl || !workerSecret) {
+      return NextResponse.json({ error: 'Processing worker is not configured.' }, { status: 503 });
+    }
+    try {
+      const response = await fetch(`${workerUrl}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': workerSecret },
+        body: JSON.stringify({ evidence_id: evidenceId }),
+      });
+      if (!response.ok) {
+        return NextResponse.json({ error: 'Evidence finalized, but processing could not be started.', evidence: updated }, { status: 502 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'Evidence finalized, but processing could not be reached.', evidence: updated }, { status: 502 });
+    }
 
-    return NextResponse.json({ evidence: updated, verified_hash: serverHash });
+    return NextResponse.json({ evidence: updated, verified_hash: serverHash, processing_requested: true });
   } catch (e) {
     if (e instanceof Response) return e;
     throw e;
