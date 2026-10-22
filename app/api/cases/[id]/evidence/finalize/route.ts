@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const { data: evidence } = await supabase
       .from('evidence')
-      .select('id, storage_path')
+      .select('id, storage_path, processing_status')
       .eq('id', evidenceId)
       .eq('case_id', id)
       .maybeSingle();
@@ -46,33 +46,72 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Hash mismatch between upload and stored file.' }, { status: 409 });
     }
 
+    // Only move awaiting_upload -> uploaded. A retry must never regress processing/ready rows.
+    const patch: Record<string, unknown> = {
+      sha256_original: serverHash,
+      uploaded_at: new Date().toISOString(),
+    };
+    if (evidence.processing_status === 'awaiting_upload') patch.processing_status = 'uploaded';
+
     const { data: updated, error: updError } = await supabaseAdmin
       .from('evidence')
-      .update({ sha256_original: serverHash, uploaded_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', evidenceId)
+      .eq('case_id', id)
       .select()
       .single();
     if (updError) return NextResponse.json({ error: updError.message }, { status: 400 });
 
-    // Finalization owns the hand-off: the worker will claim `uploaded` and move
-    // the record through `processing` to `ready` (or `failed`). The worker
-    // receives only its existing evidence_id contract and never a user token.
+    // Custody intake event. Service role only; actor comes from the verified session, never the body.
+    const { error: custodyError } = await supabaseAdmin.rpc('record_custody_event', {
+      p_case_id: id,
+      p_evidence_id: evidenceId,
+      p_actor_user_id: user.id,
+      p_event_type: 'intake',
+      p_hash: serverHash,
+      p_details: { method: 'server_sha256', note: 'Hash verified server-side at upload finalization.' },
+    });
+    // 23505 = intake already recorded (finalize retry): treat as success.
+    if (custodyError && custodyError.code !== '23505') {
+      console.error('custody intake failed', custodyError.code, custodyError.message);
+      return NextResponse.json(
+        { error: 'Custody event could not be recorded. Processing was not started.', evidence: updated },
+        { status: 500 }
+      );
+    }
+
+    // Worker hand-off. Existing contract only: { evidence_id } + X-Worker-Secret. No user token.
     const workerUrl = process.env.WORKER_URL?.replace(/\/$/, '');
     const workerSecret = process.env.WORKER_SHARED_SECRET;
     if (!workerUrl || !workerSecret) {
-      return NextResponse.json({ error: 'Processing worker is not configured.' }, { status: 503 });
+      return NextResponse.json(
+        { error: 'Processing worker is not configured.', evidence: updated },
+        { status: 503 }
+      );
     }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       const response = await fetch(`${workerUrl}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': workerSecret },
         body: JSON.stringify({ evidence_id: evidenceId }),
+        signal: controller.signal,
       });
       if (!response.ok) {
-        return NextResponse.json({ error: 'Evidence finalized, but processing could not be started.', evidence: updated }, { status: 502 });
+        return NextResponse.json(
+          { error: 'Evidence finalized, but processing could not be started.', evidence: updated },
+          { status: 502 }
+        );
       }
     } catch {
-      return NextResponse.json({ error: 'Evidence finalized, but processing could not be reached.', evidence: updated }, { status: 502 });
+      return NextResponse.json(
+        { error: 'Evidence finalized, but processing could not be reached.', evidence: updated },
+        { status: 502 }
+      );
+    } finally {
+      clearTimeout(timeout);
     }
 
     return NextResponse.json({ evidence: updated, verified_hash: serverHash, processing_requested: true });
