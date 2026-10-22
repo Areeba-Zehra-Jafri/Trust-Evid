@@ -90,20 +90,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       );
     }
 
+    const healthDeadline = Date.now() + 45_000;
+    while (Date.now() < healthDeadline) {
+      try { const health = await fetch(`${workerUrl}/health`, { signal: AbortSignal.timeout(8_000) }); if (health.ok) break; } catch { /* Render may still be waking */ }
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => controller.abort(), 20_000);
     try {
-      const response = await fetch(`${workerUrl}/process`, {
+      let response = await fetch(`${workerUrl}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': workerSecret },
         body: JSON.stringify({ evidence_id: evidenceId }),
         signal: controller.signal,
       });
       if (!response.ok) {
-        return NextResponse.json(
-          { error: 'Evidence finalized, but processing could not be started.', evidence: updated },
-          { status: 502 }
-        );
+        response = await fetch(`${workerUrl}/process`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': workerSecret }, body: JSON.stringify({ evidence_id: evidenceId }), signal: controller.signal });
+      }
+      if (!response.ok) {
+        await supabaseAdmin.from('evidence').update({ processing_status: 'failed', error: { code: 'worker_unavailable', message: 'The processing worker did not accept the request after retry.' } }).eq('id', evidenceId).eq('processing_status', 'uploaded');
+        return NextResponse.json({ error: 'Evidence was registered, but processing failed after a retry. Please use retry processing.', evidence: updated }, { status: 502 });
       }
     } catch {
       return NextResponse.json(

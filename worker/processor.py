@@ -1,5 +1,5 @@
 """Bounded retrieval and deterministic media inspection."""
-import hashlib, json, os, subprocess, tempfile
+import hashlib, json, os, subprocess, tempfile, math
 from PIL import Image
 from db import BUCKET
 VERSION = "deterministic-3"
@@ -62,12 +62,29 @@ def process_stored_evidence(client, row, limits):
                 exif = image.getexif(); fields = {str(k): str(v)[:200] for k, v in exif.items()}
                 details.update({"format": image.format, "width": image.width, "height": image.height, "exif_present": bool(exif), "exif_fields": fields})
                 if not exif: signals.append({"check": "exif", "result": "flag", "details": "metadata_missing"})
-                signals.append({"check": "recompression", "result": "not_proven", "details": {"format": image.format}})
+                signals.append({"check": "recompression", "result": "not_run", "details": {"format": image.format, "reason": "No recompression comparison was performed."}})
+                for key, value in fields.items():
+                    label = "gps" if key in {"34853", "GPSInfo"} else "personal_exif" if key in {"315", "33432", "40091", "40092", "40093", "40094", "40095"} else None
+                    if label: signals.append({"check": label, "result": "flag", "details": {"field": key, "value_present": bool(value)}})
         elif media.startswith("video/"):
             details["ffprobe"] = _video_details(path, limits)
-            signals.append({"check": "sampled_frames", "result": "not_run", "details": "bounded worker implementation"})
+            duration = details["ffprobe"]["duration_seconds"]
+            count = max(1, min(int(limits.get("frame_max_count", 5)), int(limits.get("max_sampled_frames", 5))))
+            points = [duration * i / max(count - 1, 1) for i in range(count)]
+            frames, fingerprints = [], []
+            for point in points:
+                out = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False); out.close()
+                try:
+                    subprocess.run(["ffmpeg", "-y", "-ss", f"{point:.3f}", "-i", path, "-frames:v", "1", "-vf", "scale=640:-1", out.name], capture_output=True, timeout=int(limits["ffmpeg_timeout_s"]), check=True)
+                    data = open(out.name, "rb").read(); fingerprint = hashlib.sha256(data).hexdigest()
+                    frames.append({"timestamp_seconds": round(point, 3), "sha256": fingerprint}); fingerprints.append(fingerprint)
+                finally:
+                    try: os.unlink(out.name)
+                    except OSError: pass
+            repeated = len(set(fingerprints)) < len(fingerprints)
+            signals.append({"check": "sampled_frames", "result": "flag" if repeated else "observed", "details": {"count": len(frames), "repeated_frame": repeated}})
         else: raise Rejected("unsupported_type")
-        return {"processor_version": VERSION, "metadata": details, "signals": signals, "sampled_frames": [], "limitations": ["Deterministic inspection does not establish authenticity or admissibility."]}
+        return {"processor_version": VERSION, "metadata": details, "signals": signals, "sampled_frames": frames if media.startswith("video/") else [], "limitations": ["Deterministic inspection does not establish authenticity or admissibility.", "Recompression comparison was not run." if media.startswith("image/") else "Video sampling is bounded and may miss events."]}
     finally:
         try: os.unlink(path)
         except OSError: pass
