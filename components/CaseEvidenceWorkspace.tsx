@@ -5,15 +5,12 @@ import { AIAnalysisPanel } from './AIAnalysisPanel';
 import { ReviewPanel } from './ReviewPanel';
 
 type Evidence = { id: string; original_filename?: string; processing_status?: 'awaiting_upload' | 'uploaded' | 'processing' | 'ready' | 'rejected' | 'failed'; sha256_original?: string; media_type?: string; file_size?: number; created_at?: string };
-type ChainResult = { valid?: boolean; ok?: boolean; verified?: boolean; error?: string; message?: string };
 
 export function CaseEvidenceWorkspace({ caseId }: { caseId: string }) {
   const [items, setItems] = useState<Evidence[]>([]);
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [chain, setChain] = useState<ChainResult | null>(null);
-  const [checking, setChecking] = useState(false);
 
   async function load() {
     setLoading(true); setError('');
@@ -28,22 +25,29 @@ export function CaseEvidenceWorkspace({ caseId }: { caseId: string }) {
   }
   useEffect(() => { load(); }, [caseId]);
   const current = items.find(item => item.id === selected);
-  async function verifyChain() {
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [retrying, setRetrying] = useState(false);
+  const [retryMessage, setRetryMessage] = useState('');
+  async function retry() {
     if (!current) return;
-    setChecking(true); setChain(null);
+    setRetrying(true); setRetryMessage('');
     try {
-      const response = await fetch(`/api/cases/${caseId}/evidence/${current.id}/chain`, { cache: 'no-store' });
+      const response = await fetch(`/api/cases/${caseId}/evidence/${current.id}/retry`, { method: 'POST' });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || 'Verification failed');
-      setChain(body);
-    } catch (e) { setChain({ error: e instanceof Error ? e.message : 'Verification failed' }); }
-    finally { setChecking(false); }
+      if (!response.ok) throw new Error(body.error || 'Retry could not be started');
+      setRetryMessage('Retry accepted; processing will update this item shortly.');
+      await load();
+    } catch (e) { setRetryMessage(e instanceof Error ? e.message : 'Retry could not be started'); }
+    finally { setRetrying(false); }
   }
-
+  function downloadItemReport() {
+    if (current) window.open(`/api/cases/${caseId}/evidence/${current.id}/report`, '_blank', 'noopener,noreferrer');
+  }
+  useEffect(() => { if (!current) return; fetch(`/api/cases/${caseId}/evidence/${current.id}/custody`, { cache: 'no-store' }).then(r => r.json()).then(b => setTimeline(b.custody_events || [])).catch(() => setTimeline([])); }, [caseId, current?.id]);
   return <section className="mt-6 card p-5">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Evidence review</h2><p className="text-sm text-slate-500">Select an item to review its integrity, findings, custody, and examiner notes.</p></div><button className="btn-secondary" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button></div>
     {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!loading && !error && items.length === 0 && <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No evidence has been finalized yet. Upload authorized demonstration media to begin.</p>}
-    {items.length > 0 && <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_2fr]"><div className="space-y-2">{items.map(item => <button key={item.id} onClick={() => setSelected(item.id)} className={`w-full rounded-lg border p-3 text-left text-sm ${selected === item.id ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}><span className="block truncate font-medium">{item.original_filename || item.id}</span><span className="text-xs text-slate-500">{item.processing_status || 'unknown'} · {item.media_type || 'media'} · {item.file_size ? `${item.file_size.toLocaleString()} bytes` : 'size unknown'}</span></button>)}</div><div className="min-w-0"><div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600"><span className="font-semibold">SHA-256:</span> <code className="break-all">{current?.sha256_original || 'Not finalized'}</code></div>{current && <><div className="mt-2 flex flex-wrap items-center gap-3"><button className="btn-secondary text-xs" onClick={verifyChain} disabled={checking}>{checking ? 'Verifying…' : 'Verify custody chain'}</button>{chain && <span role="status" className={`text-xs font-semibold ${chain.error ? 'text-red-700' : (chain.valid ?? chain.ok ?? chain.verified) ? 'text-emerald-700' : 'text-amber-700'}`}>{chain.error || ((chain.valid ?? chain.ok ?? chain.verified) ? 'Chain verified' : 'Chain requires review')}</span>}</div></>}</div><AIAnalysisPanel caseId={caseId} evidenceId={current?.id || ''} /><ReviewPanel caseId={caseId} evidenceId={current?.id || ''} /></div>}
+    {items.length > 0 && <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_2fr]"><div className="space-y-2">{items.map(item => <button key={item.id} onClick={() => setSelected(item.id)} className={`w-full rounded-lg border p-3 text-left text-sm ${selected === item.id ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}><span className="block truncate font-medium">{item.original_filename || item.id}</span><span className="text-xs text-slate-500">{item.processing_status || 'unknown'} · {item.media_type || 'media'} · {item.file_size ? `${item.file_size.toLocaleString()} bytes` : 'size unknown'}</span></button>)}</div><div className="min-w-0"><div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600"><span className="font-semibold">SHA-256:</span> <code className="break-all">{current?.sha256_original || 'Not finalized'}</code></div>{current && <><div className="mt-2 flex flex-wrap items-center gap-3"><span className="text-xs text-slate-500">Custody is shown as a read-only timeline below.</span><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={downloadItemReport}>Open evidence report</button>{current.processing_status === 'failed' && <button className="btn-primary" onClick={retry} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry processing'}</button>}</div>{retryMessage && <p role="status" className="text-xs text-slate-600">{retryMessage}</p>}{timeline.length > 0 && <ol className="mt-3 space-y-2 text-xs">{timeline.map(event => <li key={event.id} className="rounded border border-slate-200 bg-white p-2"><strong>{event.event_type}</strong> · {new Date(event.event_time).toLocaleString()}<div className="text-slate-500">Actor: {event.actor_user_id}</div></li>)}</ol>}</div></>}</div><AIAnalysisPanel caseId={caseId} evidenceId={current?.id || ''} /><ReviewPanel caseId={caseId} evidenceId={current?.id || ''} /></div>}
   </section>;
 }

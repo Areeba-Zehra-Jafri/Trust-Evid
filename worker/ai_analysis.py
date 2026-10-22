@@ -7,7 +7,7 @@ PROMPT_VERSION = "ai-grounded-v1"
 MAX_PROVIDER_BYTES = 256_000
 MAX_IMAGE_BYTES = 4_000_000
 BANNED = re.compile(r"\b(deepfake[sd]?|forged|forgery|fabricated)\b|\b(is|are|was|appears? to be|confirmed|proven|verified|certified)\s+(as\s+)?(authentic|genuine|fake|tampered|manipulated)\b", re.I)
-REQUIRED = ("summary", "anomalies", "uncertainty", "alternative_explanations", "next_steps", "review_priority")
+REQUIRED = ("summary", "anomalies", "uncertainty", "limitations", "next_steps", "review_priority")
 
 class AIError(Exception): pass
 class AIProviderError(AIError): pass
@@ -27,7 +27,7 @@ def validate(raw, ids):
             raise ValueError(f"{field} must be a non-empty string")
         if len(result[field]) > 5000:
             raise ValueError(f"{field} is too long")
-    for field in ("alternative_explanations", "next_steps"):
+    for field in ("limitations", "next_steps"):
         if not isinstance(result[field], list) or len(result[field]) > 50:
             raise ValueError(f"{field} must be a list of at most 50 items")
         if not all(isinstance(item, str) and item.strip() for item in result[field]):
@@ -59,7 +59,7 @@ def validate(raw, ids):
 def call_gemini(images, findings):
     key = os.getenv("GEMINI_API_KEY")
     if not key: raise AIProviderError("GEMINI_API_KEY is not configured")
-    prompt = """You provide cautious forensic triage only. Use ONLY supplied findings and images. Never state a check was run unless it is in findings. Cite finding IDs for every anomaly. Never use words authentic, genuine, fake, deepfake, forged, fabricated, tampered, or manipulated. State uncertainty and alternatives. Priority is triage, not probability. Return JSON only with summary, anomalies (description, finding_ids, location), uncertainty, alternative_explanations, next_steps, review_priority (low|medium|high).\nFINDINGS:\n""" + json.dumps(findings)
+    prompt = """You provide cautious forensic triage only. Use ONLY supplied findings and images. Never state a check was run unless it is in findings. Cite finding IDs for every anomaly. Never use words authentic, genuine, fake, deepfake, forged, fabricated, tampered, or manipulated. State uncertainty and alternatives. Priority is triage, not probability. Return JSON only with summary, anomalies (description, finding_ids, location), uncertainty, limitations, next_steps, review_priority (low|medium|high).\nFINDINGS:\n""" + json.dumps(findings)
     parts = [{"text": prompt}]
     for image in images[:5]:
         encoded = image.get("data_base64")

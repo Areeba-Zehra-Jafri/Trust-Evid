@@ -6,6 +6,12 @@ Trust-Evid is a Next.js 14 application using the App Router and Supabase for aut
 - Case and evidence management system with hash-chained custody logs.
 - Uses Supabase for email/password authentication with mandatory TOTP 2FA (AAL2 level).
 
+## Phase 5: Custody event tracking and review
+- Review events now include the six custody RPC arguments, including the session actor and stored original hash.
+- Added an AAL2-protected read-only custody timeline endpoint; examiner access requires an assignment.
+- Retired custody-chain verification controls and replaced them with timeline display.
+- The six-argument custody RPC migration is waiting for approval in the Database panel and has not run.
+
 ## Phase 4: Custody, integrity and examiner workflow
 - Protected RPC contracts are added for custody event recording and chain verification.
 - Review and examiner-note API routes support review states, priority, limitations, and audit notes.
@@ -109,3 +115,22 @@ Remaining production blockers are the unverified atomic claim/stale retry databa
 - Extended focused Vitest coverage for worker digest and byte-count validation, AAL2/role authorization, case/evidence relationship checks, first finalization, matching and conflicting retries, rollback/error behavior, unsupported RPC states, and custody-event repeatability.
 - Added source-contract checks for explicit processing-state allowlists, complete existing-index validation (including validity/readiness/predicate), and SECURITY DEFINER ownership/ACL auditing.
 - These tests distinguish migration source contracts from PostgreSQL integration evidence: no live database or local PostgreSQL migration execution is claimed.
+
+## Phase 6: Evidence reports and retry
+- Each evidence item has an AAL2-protected report endpoint with metadata, hash, deterministic findings, explicitly labelled AI interpretation/incomplete state, reviews, notes, custody history, and limitations.
+- Failed evidence with a stored original can be retried by an investigator or uploader; retry resets it to `uploaded`, dispatches the worker, and safely marks it failed if dispatch fails.
+
+## Phase 6: Evidence reports and retry
+- Evidence reports expose metadata, hashes, deterministic findings, clearly labelled AI interpretation/incomplete state, review notes, and custody history.
+- Reports include the required hash-match disclaimer and limitations without presenting an authenticity or validity verdict.
+- Investigators and uploaders can retry failed evidence when a stored original exists; the route resets to `uploaded`, dispatches the worker with the shared secret, and marks dispatch failures as `failed`.
+
+## Phase 6: Evidence reports and retry
+- Evidence reports expose metadata, hashes, deterministic findings, clearly labelled AI interpretation/incomplete state, review notes, and custody history.
+- Reports include the required hash-match disclaimer and limitations without presenting an authenticity or validity verdict.
+- Investigators and uploaders can retry failed evidence when a stored original exists; the route resets to `uploaded`, dispatches the worker with the shared secret, and marks dispatch failures as `failed`. The evidence workspace provides report and retry controls.
+
+## Phase 4: AI triage integration
+- The authenticated evidence AI route requires deterministic `processing_status=ready` and dispatches only `{ evidence_id }` to the worker using `X-Worker-Secret`; user access tokens are never sent to the worker.
+- The worker `/triage` endpoint is independently gated on `ready`, calls Gemini using `AI_MODEL`, validates the bounded advisory schema (`summary`, `anomalies`, `uncertainty`, `limitations`, `next_steps`, `review_priority`), and persists either `complete` or `incomplete` analysis without changing evidence status.
+- Gemini receives deterministic findings only in this integration; GPS and personal EXIF are not included. AI failures remain explicitly incomplete and preserve deterministic findings.
