@@ -1,6 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/browser';
+import { LIMITS } from '@/lib/limits';
+
+const ALLOWED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'video/mp4'] as const;
 
 export function EvidenceIntake({ caseId }: { caseId: string }) {
   const [file, setFile] = useState<File | null>(null);
@@ -8,6 +11,14 @@ export function EvidenceIntake({ caseId }: { caseId: string }) {
   const [busy, setBusy] = useState(false);
   async function submit() {
     if (!file) return;
+    if (!ALLOWED_MEDIA_TYPES.includes(file.type as (typeof ALLOWED_MEDIA_TYPES)[number])) {
+      setMessage('Unsupported file type. Use JPEG, PNG, or MP4.');
+      return;
+    }
+    if (file.size <= 0 || file.size > LIMITS.max_file_size) {
+      setMessage(`File is too large. Maximum size is ${Math.round(LIMITS.max_file_size / 1024 / 1024)} MB.`);
+      return;
+    }
     setBusy(true); setMessage('');
     try {
       const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
@@ -20,9 +31,10 @@ export function EvidenceIntake({ caseId }: { caseId: string }) {
       const done = await fetch(`/api/cases/${caseId}/evidence/finalize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ evidence_id: start.evidence.id, sha256: hash }) });
       const result = await done.json();
       if (!done.ok) throw new Error(result.error);
-      setMessage(`Uploaded. SHA-256: ${hash}`); setFile(null);
+      if (!result.processing_requested) throw new Error('Evidence was finalized but processing was not started.');
+      setMessage(`Uploaded and processing started. SHA-256: ${hash}`); setFile(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Upload failed.'); }
     finally { setBusy(false); }
   }
-  return <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-lg font-semibold">Evidence intake</h2><p className="mb-4 text-sm text-slate-600">Synthetic or authorized image/video files only. Originals remain private.</p><input type="file" accept="image/*,video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /><button disabled={!file || busy} onClick={submit} className="ml-3 rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">{busy ? 'Uploading…' : 'Upload evidence'}</button>{message && <p className="mt-3 break-all text-sm">{message}</p>}</section>;
+  return <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-lg font-semibold">Evidence intake</h2><p className="mb-4 text-sm text-slate-600">Synthetic or authorized image/video files only. Originals remain private.</p><input type="file" accept="image/jpeg,image/png,video/mp4" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /><button disabled={!file || busy} onClick={submit} className="ml-3 rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">{busy ? 'Uploading…' : 'Upload evidence'}</button>{message && <p className="mt-3 break-all text-sm">{message}</p>}</section>;
 }

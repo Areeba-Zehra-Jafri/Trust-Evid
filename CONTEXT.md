@@ -1,50 +1,37 @@
 # CONTEXT.md
-Last updated: Phase 5 · Batch 1-2 status update
+Last updated: Phase 3 · Protected custody logging caller audit
 
 ## Done
-- Initial frontend build audit and implementation plan are complete.
-- Batch 1 authentication wrappers are applied: dashboard authentication redirects preserve thrown auth Responses; cases GET/POST preserve unexpected errors; evidence listing and upload handlers use the documented auth wrapper and verified MIME/byte limits.
-- Batch 1b authentication wrappers are applied to every exported handler in the specified finalize, process, AI, chain, notes, review, and report routes. Each calls `requireAal2User()` without arguments and preserves thrown `Response` objects.
-- The EvidenceIntake refactor is complete: it imports and uses the static `supabaseBrowser` client for signed storage uploads.
-- Optional Gemini processing is explicitly opt-in and additive to deterministic findings.
-- Provider and validation failures are represented as incomplete AI processing when persistence succeeds; deterministic output remains authoritative.
-- AI provider responses and inline image inputs now have explicit bounded byte budgets before parsing/transmission.
-- Structured AI output is bounded, citation-checked (including citation types), and screened for unsafe authenticity claims.
-- Docker copies the worker runtime import graph and limits.json.
-- Focused worker tests cover authentication, exact intake payloads, limits, hashing, AI validation/failure, and packaging contracts.
+- Initial frontend audit and previously completed Batch 1/1b/2 work remain unchanged.
+- Chunk 0 full-read audit completed for the requested routes, case page, worker modules, and relevant migrations. No obviously spliced or duplicated code was found in those files; known contract mismatches remain recorded below.
+- Chunk 2 UI/API alignment applied: evidence insertion explicitly sets `owner_user_id` from the verified session; the evidence workspace uses `processing_status`, `original_filename`, `media_type`, and `file_size`; finalize dispatches `/process` after upload finalization.
+- Chunk 1 protected custody database changes are treated as already applied live and committed by the user: the custody RPC is service-role-only with explicit `p_actor_user_id`; direct authenticated/anonymous custody mutation is not allowed; UPDATE, DELETE, and TRUNCATE are blocked; and a partial unique index permits one intake event per evidence (duplicate attempts use SQLSTATE 23505).
 
-## In progress
-- Type checking and runtime verification remain pending for the completed Batch 1-2 changes.
-- Test execution and Docker startup were not run because no command runner is available in this workspace.
-- Atomic claim, stale recovery, retry semantics, and custody RPC compatibility remain blocked by unverified deployed database contracts.
-- AI persistence and deployed column/RLS behavior remain unverified.
-Last updated: Phase 6 transactional finalization tests (extended validation coverage)
+## Chunk 1 caller audit (read-only)
+The repository-wide custody caller audit found these references; no hit was changed:
 
-## State
-Phase 5 provides a local-only `finalize_verified_evidence` RPC and the finalize route delegates persistence to it after worker byte verification. Phase 6 now includes focused Vitest coverage for digest/count validation, authorization, case scoping, first finalization, retry conflicts, rollback-oriented error mapping, custody repeatability, duplicate-history/index safeguards, digest normalization, and the limits of source-contract tests.
+- `supabase/migrations/20261021065232_custody_examiner_workflow.sql`: legacy migration definition and grants for `record_custody_event(p_case_id, p_evidence_id, p_event_type, p_hash, p_details)`. This is the old five-argument form and relies on `auth.uid()`. It is historical migration text and was not edited.
+- `app/api/cases/[id]/evidence/[evidenceId]/chain/route.ts`: calls `verify_custody_chain`, not `record_custody_event`. This route must not be treated as a custody writer; the verification function is a known stub and must not be presented as proving a valid chain.
+- `README.md`: descriptive references to custody RPC/verification behavior; no executable caller.
 
-## Done
-- `tests/finalize-route.test.ts` covers strict input validation, AAL2/role authorization, case-scoped lookup, worker-first verification, worker digest/count forwarding, matching/conflicting retries, malformed worker responses, timeouts, RPC failures, and invalid RPC results.
-- `tests/finalize-migration.test.ts` checks the migration text for authentication, fixed search path, locking, relationship, digest/count validation, retry semantics, uniqueness, and no custody deletion/rewrite.
-- `tests/finalize-phase6.test.ts` adds focused checks for terminal-state handling, intake digest/count agreement, duplicate-history/index preflight, append-only custody behavior, digest normalization, authorization ordering, and explicit non-proof of PostgreSQL concurrency/rollback.
-- Finalization uses the transactional RPC as its sole persistence path.
+No direct application `insert` into `custody_events` was found in the inspected app, lib, worker, or test sources. No current executable caller using the old five-argument `record_custody_event` form was found outside the historical migration text. No worker or test caller was found. The finalize route was not modified as part of this read-only audit.
 
-## In progress
-- The migration is local-only and has not been applied to the linked database.
-- Tests are written but unexecuted because this workspace has no command runner.
+## In progress / verification limits
+- `npx tsc --noEmit`, `npm run build`, tests, live SQL checks, and branch/commit inspection are NOT RUN in this tool environment because no command runner is available. No passing result is claimed.
+- Live function bodies, trigger inventory, grants, and deployed schema were not independently queried here; the live facts above are recorded from the user-supplied confirmation.
+- The current finalize route still uses its existing service-role evidence persistence path. This audit does not alter it.
 
 ## Next
-1. Review historical duplicate intake events read-only before any migration approval.
-2. Run `npm test`, `npm run typecheck`, `npm run build`, and `cd worker && pytest` in an environment with command execution.
-3. Add disposable-Postgres integration tests with separate sessions to prove rollback, locking, index-definition rejection, ACL behavior, and concurrent finalization.
+- Stop after Chunk 1 as required. Do not begin evidence/custody mutation hardening, storage limits, report/export changes, worker contract changes, or any other later phase without explicit authorization.
+- Do not use `verify_custody_chain` as evidence that a chain is valid; it is a stub that returns `valid: true` with limitations.
 
-## Decisions
-- Route tests mock auth, worker, and Supabase boundaries; they do not prove live transaction safety.
-- Migration tests are source-contract checks, not SQL execution.
-- Worker-computed digest and byte count are authoritative; browser digest is optional comparison input.
+## Scope note
+This update records the protected custody logging caller audit only. No migration, route, worker, dependency, environment variable, or unrelated source file was changed.
 
-## Open blockers
-- RPC permissions, trigger interaction, historical duplicate compatibility, rollback, and concurrency remain unverified against PostgreSQL.
-- No commands were executed in this session.
 
-CONTEXT.md updated: yes
+## Phase 4 — Evidence and custody mutation hardening
+- Client mutation audit: evidence intake uses API routes; no browser Supabase evidence update, upsert, or delete mutation was found in the inspected client components. The only evidence rollback mutation is server-side and now marks the row `failed` through `supabaseAdmin`; evidence is never hard-deleted.
+- Review custody recording now uses the service-role RPC with the verified session actor (`p_actor_user_id: user.id`); no user access token is sent to the worker.
+- Prepared protections: revoke authenticated/anonymous evidence UPDATE and DELETE policies/privileges, and change custody foreign keys to `ON DELETE RESTRICT`. Custody grants, policies, and triggers remain unchanged.
+- `verify_custody_chain` remains a stub and must never be presented as proof that a chain is valid.
+- Migration application is pending the separately shown evidence-protection and custody-FK migrations. Build, typecheck, tests, and live verification are NOT RUN because no command runner is available.
