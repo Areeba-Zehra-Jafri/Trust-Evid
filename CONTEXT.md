@@ -27,3 +27,11 @@ No direct application `insert` into `custody_events` was found in the inspected 
 
 ## Scope note
 This update records the protected custody logging caller audit only. No migration, route, worker, dependency, environment variable, or unrelated source file was changed.
+
+
+## Phase 4 — Evidence and custody mutation hardening
+- Client mutation audit: evidence intake uses API routes; no browser Supabase evidence update, upsert, or delete mutation was found in the inspected client components. The only evidence rollback mutation is server-side and now marks the row `failed` through `supabaseAdmin`; evidence is never hard-deleted.
+- Review custody recording now uses the service-role RPC with the verified session actor (`p_actor_user_id: user.id`); no user access token is sent to the worker.
+- Prepared protections: revoke authenticated/anonymous evidence UPDATE and DELETE policies/privileges, and change custody foreign keys to `ON DELETE RESTRICT`. Custody grants, policies, and triggers remain unchanged.
+- `verify_custody_chain` remains a stub and must never be presented as proof that a chain is valid.
+- Migration application is pending the separately shown evidence-protection and custody-FK migrations. Build, typecheck, tests, and live verification are NOT RUN because no command runner is available.

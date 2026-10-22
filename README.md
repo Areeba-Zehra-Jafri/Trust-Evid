@@ -69,6 +69,11 @@ Set these in the workspace Secrets panel.
 - Matching retries return `already_finalized`; conflicting hashes or intake records fail. The migration includes a partial unique intake index. Review existing data for duplicate intake rows before applying it; this migration has not been applied to the linked database.
 - The finalize route now verifies worker output and uses only the RPC for persistence, with safe conflict and authorization mappings. No live migration or database integration tests were run.
 
+## Phase 5: Evidence storage limits
+- Evidence originals remain private and are restricted to JPEG, PNG, and MP4 uploads.
+- Intake validates MIME type and `LIMITS.max_file_size` in the browser and API before issuing a signed upload URL.
+- The linked database bucket metadata update is prepared as a migration and is waiting for approval in the Database panel; it has not been applied.
+
 ## Phase 6: Reports, deployment and acceptance
 - AAL2-protected report download is available from each case at `/api/cases/[id]/report`.
 - Reports include visible evidence, deterministic findings, review priorities, examiner notes, custody events, and explicit limitations. JSON is intentional and can be printed or archived without claiming authenticity or legal admissibility.
