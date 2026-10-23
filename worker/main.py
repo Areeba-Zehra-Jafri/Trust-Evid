@@ -30,12 +30,19 @@ async def process(request: Request):
         result = process_stored_evidence(client, row, load_limits())
         digest = result["metadata"]["sha256"]
         if row.get("sha256_original") and not hmac.compare_digest(row["sha256_original"].lower(), digest.lower()): raise ValueError("original_hash_mismatch")
+        # Deterministic completion remains authoritative; AI is additive and
+        # never changes the evidence processing status.
         persist_result(client, row, result); record_processing_custody(client, row, digest)
         return JSONResponse({"accepted": True, "status": "ready"}, 202)
     except Exception as exc:
+        # Always leave a claimed row terminal, and keep the detailed cause in
+        # the database/logs without exposing storage or credentials to callers.
+        import logging
+        logging.getLogger(__name__).exception("processing failed evidence_id=%s", evidence_id)
         try: set_failed(client, evidence_id, str(exc))
-        except Exception: pass
-        raise HTTPException(400, "Evidence processing failed")
+        except Exception: logging.getLogger(__name__).exception("failed to persist terminal failure evidence_id=%s", evidence_id)
+        code = getattr(exc, "code", "processing_failed")
+        raise HTTPException(400, f"Evidence processing failed ({code})")
 
 @app.post("/triage")
 async def triage(request: Request):

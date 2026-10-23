@@ -23,11 +23,27 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     if (resetError) return NextResponse.json({ error: 'Could not reset evidence for retry.' }, { status: 500 });
 
     try {
+      // Render's free instance may be asleep. Warm it first, then retry the
+      // actual job once; the worker remains authenticated only by its secret.
+      const deadline = Date.now() + 45_000;
+      while (Date.now() < deadline) {
+        try {
+          const health = await fetch(`${workerUrl}/health`, { signal: AbortSignal.timeout(8_000) });
+          if (health.ok) break;
+        } catch { /* continue warming */ }
+        await new Promise((resolve) => setTimeout(resolve, 3_000));
+      }
       const response = await fetch(`${workerUrl}/process`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': secret },
         body: JSON.stringify({ evidence_id: evidenceId }), signal: AbortSignal.timeout(10000),
       });
-      if (!response.ok) throw new Error(`worker status ${response.status}`);
+      if (!response.ok) {
+        const second = await fetch(`${workerUrl}/process`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': secret },
+          body: JSON.stringify({ evidence_id: evidenceId }), signal: AbortSignal.timeout(20000),
+        });
+        if (!second.ok) throw new Error(`worker status ${second.status}`);
+      }
       return NextResponse.json({ accepted: true, processing_status: 'uploaded' });
     } catch {
       await supabase.from('evidence').update({ processing_status: 'failed', error: { message: 'Retry worker dispatch failed.' } })

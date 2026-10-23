@@ -7,6 +7,7 @@ import { ReviewPanel } from "@/components/ReviewPanel";
 import { ReportPanel } from "@/components/ReportPanel";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { CaseEvidenceWorkspace } from "@/components/CaseEvidenceWorkspace";
+import { CaseMembers } from "@/components/CaseMembers";
 
 type CasePageProps = {
   params: Promise<{ id: string }>;
@@ -56,6 +57,7 @@ export default async function CasePage({
       <p>{caseData.description}</p>
       {(role === "investigator" || role === "uploader") && <EvidenceIntake caseId={id} />}
       {role === "examiner" && <p className="mt-6 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Examiner workflow: review findings, record limitations, and preserve notes. This prototype does not establish authenticity or legal admissibility.</p>}
+      <CaseMembers caseId={id} canManage={role === "investigator"} />
       <CaseEvidenceWorkspace caseId={id} />
       <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">Select an evidence item above to open its analysis and review controls. Reports remain available for the whole case.</p>
       <ReportPanel caseId={id} />

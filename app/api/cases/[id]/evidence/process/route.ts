@@ -44,7 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => controller.abort(), 20_000);
     let response: Response;
     try {
       response = await fetch(`${workerUrl}/process`, {
@@ -58,9 +58,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (!response.ok) {
+      const workerMessage = await response.text().catch(() => '');
       const status = response.status === 404 ? 404 : response.status === 429 ? 503 : 502;
       return NextResponse.json(
-        { error: 'Processing worker rejected the request.', worker_status: response.status },
+        { error: workerMessage ? `Processing worker rejected the request (${response.status}).` : 'Processing worker rejected the request.', worker_status: response.status },
         { status }
       );
     }

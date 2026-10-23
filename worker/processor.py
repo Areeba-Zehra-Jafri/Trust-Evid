@@ -2,7 +2,12 @@
 import hashlib, json, os, subprocess, tempfile, math
 from PIL import Image
 from db import BUCKET
-VERSION = "deterministic-3"
+VERSION = "deterministic-4"
+
+# EXIF tag IDs defined by the TIFF/EXIF standards. Values are never persisted
+# for privacy; only the presence of sensitive fields is reported.
+GPS_TAGS = {34853}
+PERSONAL_EXIF_TAGS = {315, 33432, 40091, 40092, 40093, 40094, 40095}
 
 class Rejected(ValueError):
     def __init__(self, code, **values):
@@ -59,18 +64,25 @@ def process_stored_evidence(client, row, limits):
             with Image.open(path) as image:
                 pixels = image.width * image.height
                 if pixels > int(limits["image_max_pixels"]): raise Rejected("image_max_pixels", actual=pixels)
-                exif = image.getexif(); fields = {str(k): str(v)[:200] for k, v in exif.items()}
+                exif = image.getexif(); fields = {str(k): ("present" if int(k) in GPS_TAGS | PERSONAL_EXIF_TAGS else str(v)[:200]) for k, v in exif.items() if str(k).isdigit()}
                 details.update({"format": image.format, "width": image.width, "height": image.height, "exif_present": bool(exif), "exif_fields": fields})
                 if not exif: signals.append({"check": "exif", "result": "flag", "details": "metadata_missing"})
                 signals.append({"check": "recompression", "result": "not_run", "details": {"format": image.format, "reason": "No recompression comparison was performed."}})
                 for key, value in fields.items():
-                    label = "gps" if key in {"34853", "GPSInfo"} else "personal_exif" if key in {"315", "33432", "40091", "40092", "40093", "40094", "40095"} else None
+                    try:
+                        tag_id = int(key)
+                    except ValueError:
+                        tag_id = -1
+                    label = "gps" if tag_id in GPS_TAGS or key == "GPSInfo" else "personal_exif" if tag_id in PERSONAL_EXIF_TAGS else None
                     if label: signals.append({"check": label, "result": "flag", "details": {"field": key, "value_present": bool(value)}})
         elif media.startswith("video/"):
             details["ffprobe"] = _video_details(path, limits)
             duration = details["ffprobe"]["duration_seconds"]
             count = max(1, min(int(limits.get("frame_max_count", 5)), int(limits.get("max_sampled_frames", 5))))
-            points = [duration * i / max(count - 1, 1) for i in range(count)]
+            # Fixed, bounded intervals avoid an end-frame seek failure and make
+            # repeated-frame detection reproducible across worker runs.
+            interval = duration / count if duration > 0 else 0
+            points = [min(interval * (i + 0.5), max(duration - 0.001, 0)) for i in range(count)]
             frames, fingerprints = [], []
             for point in points:
                 out = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False); out.close()

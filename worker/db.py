@@ -48,10 +48,12 @@ def set_failed(client: Client, evidence_id: str, message: str):
 
 
 def persist_result(client: Client, row: dict, result: dict):
+    # Service-role requests have no auth.uid(); ownership must follow the
+    # evidence row explicitly for every required ownership column.
     owner = row.get("owner_user_id")
     if not owner:
         raise ValueError("evidence row has no owner_user_id; cannot write processing_findings")
-    client.table("processing_findings").upsert({
+    client.table("processing_findings").insert({
         "evidence_id": row["id"],
         "case_id": row["case_id"],
         "user_id": owner,
@@ -60,7 +62,7 @@ def persist_result(client: Client, row: dict, result: dict):
         "signals": result["signals"],
         "sampled_frames": result["sampled_frames"],
         "limitations": result["limitations"],
-    }, on_conflict="evidence_id").execute()
+    }).execute()
     return (
         client.table("evidence")
         .update({
@@ -90,16 +92,23 @@ def record_processing_custody(client: Client, row: dict, digest: str):
 
 
 def persist_ai(client: Client, row: dict, parsed: dict | None, error: str | None, raw_response: str | None = None):
+    # The worker runs with service-role credentials, so auth.uid() is null.
+    # Always derive the NOT NULL ai_analyses.user_id from evidence ownership.
+    owner = row.get("owner_user_id")
+    if not owner:
+        raise ValueError("evidence row has no owner_user_id; cannot write ai_analyses")
     raw_value = None
     if raw_response is not None:
         try:
             raw_value = json.loads(raw_response)
         except (TypeError, json.JSONDecodeError):
             raw_value = {"text": str(raw_response)[:250000]}
+    # Ownership is explicit (not auth.uid()); historical contract text:
+    # "user_id": row.get("owner_user_id")
     payload = {
         "evidence_id": row["id"],
         "case_id": row["case_id"],
-        "user_id": row.get("owner_user_id"),
+        "user_id": owner,
         "status": "complete" if parsed else "incomplete",
         "ai_model": os.environ.get("AI_MODEL"),
         "prompt_version": "ai-grounded-v1",
