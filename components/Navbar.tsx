@@ -35,18 +35,26 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-gray-800 text-white p-4 flex justify-between">
+    <nav className="flex min-w-0 flex-wrap items-center justify-between gap-3 bg-gray-800 p-4 text-white">
       <Link href="/dashboard" className="font-bold">
         Trust-Evid
       </Link>
       {user ? (
-        <div className="flex items-center">
-          <span>{user.email}</span>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
+          <span className="max-w-[14rem] truncate text-slate-200" title={user.email ?? undefined}>
+            {user.email}
+          </span>
+          <Link
+            href="/dashboard"
+            className="rounded px-2 py-1 hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Dashboard
+          </Link>
           <button
             onClick={signOut}
-            className="ml-4 bg-red-600 px-2 py-1 rounded"
+            className="rounded bg-red-600 px-3 py-1.5 font-medium hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
           >
-            Sign Out
+            Sign out
           </button>
         </div>
       ) : (

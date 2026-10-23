@@ -43,3 +43,13 @@
     @apply mt-1 text-xs text-red-600;
   }
 }
+
+/* Keep dense review controls usable at the 375px mobile target. */
+@media (max-width: 640px) {
+  .btn {
+    @apply max-w-full whitespace-normal text-center;
+  }
+  input[type="file"] {
+    @apply block max-w-full text-xs;
+  }
+}

@@ -8,6 +8,7 @@ import { ReportPanel } from "@/components/ReportPanel";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { CaseEvidenceWorkspace } from "@/components/CaseEvidenceWorkspace";
 import { CaseMembers } from "@/components/CaseMembers";
+import Link from "next/link";
 
 type CasePageProps = {
   params: Promise<{ id: string }>;
@@ -51,6 +52,12 @@ export default async function CasePage({
 
   return (
     <main className="p-4">
+      <Link
+        href="/dashboard"
+        className="mb-5 inline-flex items-center text-sm font-semibold text-brand-700 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        ← Back to cases
+      </Link>
       <h1 className="mb-4 text-2xl font-bold">
         {caseData.title}
       </h1>

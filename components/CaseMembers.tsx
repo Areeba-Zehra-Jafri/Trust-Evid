@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ActionFeedback } from './ActionFeedback';
 
 type Member = { user_id: string; role: string; email: string | null };
 
@@ -48,12 +49,12 @@ export function CaseMembers({ caseId, canManage }: { caseId: string; canManage: 
   }
 
   return (
-    <section className="card mt-6 p-4" aria-labelledby="members-heading">
+    <section className="card mt-6 min-w-0 overflow-hidden p-4" aria-labelledby="members-heading">
       <h2 id="members-heading" className="font-semibold">Case members</h2>
-      {loading ? <p className="mt-3 text-sm text-slate-500">Loading members…</p> : members.length === 0 ? <p className="mt-3 text-sm text-slate-500">No members found.</p> : <ul className="mt-3 space-y-2 text-sm">{members.map((member) => <li key={member.user_id} className="flex flex-wrap justify-between gap-2"><span>{member.email ?? member.user_id}</span><span className="text-slate-500">{member.role}</span></li>)}</ul>}
-      {canManage && <div className="mt-4 flex flex-wrap gap-2"><label className="sr-only" htmlFor="member-email">Member email</label><input id="member-email" className="input max-w-xs" type="email" placeholder="member@example.com" value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} /><label className="sr-only" htmlFor="member-role">Member role</label><select id="member-role" className="input w-auto" value={role} onChange={(event) => setRole(event.target.value)} disabled={busy}><option value="investigator">Investigator</option><option value="uploader">Uploader</option><option value="examiner">Examiner</option></select><button className="btn-primary" onClick={() => void addMember()} disabled={busy || !email.trim()}>{busy ? "Adding…" : "Add member"}</button></div>}
-      {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
-      {success && <p role="status" className="mt-2 text-sm text-green-700">{success}</p>}
+      {loading ? <p className="mt-3 text-sm text-slate-500">Loading members…</p> : members.length === 0 ? <p className="mt-3 text-sm text-slate-500">No members found.</p> : <ul className="mt-3 space-y-2 text-sm">{members.map((member) => <li key={member.user_id} className="flex min-w-0 flex-wrap justify-between gap-2"><span className="min-w-0 max-w-full break-all">{member.email ?? member.user_id}</span><span className="shrink-0 text-slate-500">{member.role}</span></li>)}</ul>}
+      {canManage && <div className="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap"><label className="sr-only" htmlFor="member-email">Member email</label><input id="member-email" className="input min-w-0 max-w-full sm:max-w-xs" type="email" placeholder="member@example.com" value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} /><label className="sr-only" htmlFor="member-role">Member role</label><select id="member-role" className="input w-auto" value={role} onChange={(event) => setRole(event.target.value)} disabled={busy}><option value="investigator">Investigator</option><option value="uploader">Uploader</option><option value="examiner">Examiner</option></select><button className="btn-primary" onClick={() => void addMember()} disabled={busy || !email.trim()}>{busy ? "Working..." : "Add member"}</button></div>}
+      {error && <ActionFeedback message={error} kind="error" onDismiss={() => setError("")} />}
+      {success && <ActionFeedback message={success} kind="success" onDismiss={() => setSuccess("")} />}
     </section>
   );
 }
