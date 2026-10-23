@@ -5,7 +5,7 @@ from urllib.request import Request, urlopen
 
 log = logging.getLogger(__name__)
 
-MODEL = os.getenv("AI_MODEL", "gemini-3-flash-preview")
+MODEL = os.getenv("AI_MODEL", "gemini-3.5-flash-lite")
 PROMPT_VERSION = "ai-grounded-v1"
 MAX_PROVIDER_BYTES = 256_000
 MAX_IMAGE_BYTES = 4_000_000
