@@ -1,7 +1,6 @@
 'use client';
 
-import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 type Signal = { check?: string; result?: string; details?: unknown };
@@ -25,6 +24,7 @@ export default function PrintableEvidenceReport() {
   const params = useParams<{ id: string; evidenceId: string }>();
   const id = params?.id;
   const evidenceId = params?.evidenceId;
+  const router = useRouter();
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export default function PrintableEvidenceReport() {
   useEffect(() => { void load(); }, [load]);
 
   if (loading) return <main className="p-8">Loading report…</main>;
-  if (error) return <main className="p-8"><h1 className="text-xl font-bold">Unable to load report</h1><p className="my-4">{error}</p><button onClick={() => void load()} className="rounded bg-slate-900 px-4 py-2 text-white">Retry</button></main>;
+  if (error) return <main className="p-8"><h1 className="text-xl font-bold">Unable to load report</h1><p className="my-4">{error}</p><button onClick={() => void load()} className="no-print rounded bg-slate-900 px-4 py-2 text-white">Retry</button></main>;
   if (!report) return <main className="p-8">No report was returned.</main>;
 
   const e = report.evidence || {};
@@ -52,11 +52,19 @@ export default function PrintableEvidenceReport() {
   const findings = report.deterministic_findings || [];
   const signals = findings.flatMap((finding) => finding.signals || []);
   const disclaimer = "Hash match shows bytes match the registered intake version; it does not prove authenticity.";
+  const downloadPdf = () => {
+    // The browser's native print dialog is the dependency-free PDF exporter.
+    // A descriptive title becomes the default filename in most browsers.
+    const previousTitle = document.title;
+    document.title = `Evidence Review Report - ${text(e.original_filename, evidenceId)}`;
+    window.print();
+    window.setTimeout(() => { document.title = previousTitle; }, 1000);
+  };
 
   return <>
     <style>{`@media print { .no-print, nav, header { display:none !important } body { background:#fff; color:#000 } section, table { break-inside:avoid } main { margin:0.5in } } * { overflow-wrap:anywhere }`}</style>
     <main className="mx-auto max-w-4xl space-y-6 bg-white p-6 text-slate-900">
-      <div className="no-print flex gap-3"><button onClick={() => window.print()} className="rounded bg-slate-900 px-4 py-2 text-white">Download PDF</button><Link href="/dashboard" className="rounded border px-4 py-2">Back</Link></div>
+      <div className="no-print flex gap-3"><button type="button" onClick={downloadPdf} className="no-print rounded bg-slate-900 px-4 py-2 text-white" aria-label="Download PDF using the browser print dialog">Download PDF</button><button onClick={() => router.back()} className="no-print rounded border px-4 py-2">Back</button></div>
       <header><h1 className="text-3xl font-bold">Evidence Review Report</h1><p>Generated: {text(report.generated_at)}</p></header>
       <section><h2 className="text-xl font-semibold">Report metadata</h2><dl className="grid gap-1 sm:grid-cols-2">{[["Case ID", id],["Evidence ID", evidenceId],["File name",e.original_filename],["Media type",e.media_type],["File size",e.file_size],["Processing status",e.processing_status]].map(([label,value])=><div key={String(label)}><dt className="font-semibold">{String(label)}</dt><dd>{text(value)}</dd></div>)}</dl></section>
       <section><h2 className="text-xl font-semibold">SHA-256</h2><p className="font-mono">{text(report.hash?.sha256_original || e.sha256_original)}</p><p className="text-sm">{disclaimer}</p></section>
